@@ -36,42 +36,10 @@
 
         /* === 🔴 GLOWING RED LIGHT MARKER CSS === */
         .pulse-marker { position: absolute; width: 24px; height: 24px; cursor: pointer; transform: translate(-50%, -50%); z-index: 50; }
-        
-        /* The Core Red Light */
-        .pulse-core { 
-            width: 100%; height: 100%; 
-            background-color: #ef4444; /* Red-500 */
-            border-radius: 50%; 
-            border: 3px solid white; 
-            /* This creates the glowing LED effect */
-            box-shadow: 0 0 15px 4px rgba(239, 68, 68, 0.8); 
-            position: absolute; 
-            z-index: 2; 
-            transition: all 0.3s ease;
-        }
-
-        /* The Rippling Ring Animation */
-        .pulse-ring { 
-            position: absolute; top: 0; left: 0; 
-            width: 100%; height: 100%; 
-            border-radius: 50%; 
-            border: 3px solid #ef4444; 
-            opacity: 0; 
-            z-index: 1; 
-            animation: ripple 2s infinite ease-out; 
-        }
-        
-        @keyframes ripple { 
-            0% { transform: scale(1); opacity: 1; } 
-            100% { transform: scale(4); opacity: 0; } 
-        }
-
-        /* Hover Effect */
-        .pulse-marker:hover .pulse-core { 
-            transform: scale(1.2); 
-            background-color: #dc2626; /* Red-600 */
-            box-shadow: 0 0 25px 8px rgba(220, 38, 38, 0.9); /* Stronger glow */
-        }
+        .pulse-core { width: 100%; height: 100%; background-color: #ef4444; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px 4px rgba(239, 68, 68, 0.8); position: absolute; z-index: 2; transition: all 0.3s ease; }
+        .pulse-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; border: 3px solid #ef4444; opacity: 0; z-index: 1; animation: ripple 2s infinite ease-out; }
+        @keyframes ripple { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(4); opacity: 0; } }
+        .pulse-marker:hover .pulse-core { transform: scale(1.2); background-color: #dc2626; box-shadow: 0 0 25px 8px rgba(220, 38, 38, 0.9); }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-slate-900">
@@ -128,17 +96,10 @@
                 </div>
                 
                 <div class="relative">
-                    <button onclick="toggleProfileMenu()" class="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg shadow-lg hover:bg-blue-600 transition-colors">
-                        CW
-                    </button>
-                    
+                    <button onclick="toggleProfileMenu()" class="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg shadow-lg hover:bg-blue-600 transition-colors">CW</button>
                     <div id="profile-menu" class="hidden absolute right-0 top-14 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50">
-                        <div class="px-4 py-2 border-b border-slate-50 mb-1">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase">Account</span>
-                        </div>
-                        <button onclick="handleLogout()" class="w-full text-left px-4 py-3 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition flex items-center gap-2">
-                            <i class="fas fa-sign-out-alt"></i> Sign Out
-                        </button>
+                        <div class="px-4 py-2 border-b border-slate-50 mb-1"><span class="text-[10px] font-bold text-slate-400 uppercase">Account</span></div>
+                        <button onclick="handleLogout()" class="w-full text-left px-4 py-3 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition flex items-center gap-2"><i class="fas fa-sign-out-alt"></i> Sign Out</button>
                     </div>
                 </div>
             </div>
@@ -165,7 +126,6 @@
                 <div class="stats-card p-6 shadow-xl mb-10 overflow-hidden relative">
                     <h3 class="text-lg font-black mb-4 flex items-center gap-2"><i class="fas fa-map-marked-alt text-blue-500"></i> Live Unresolved Issues</h3>
                     <div id="admin-map" class="bg-slate-100"></div>
-                    
                     <div class="absolute top-20 right-10 bg-white/90 backdrop-blur px-4 py-3 rounded-xl shadow-lg border border-slate-200 z-10 text-xs">
                         <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-red-500 border border-white box-shadow-glow"></span> <b>Critical (Pulsing)</b></div>
                         <p class="text-[10px] text-slate-400 mt-1">Click a red light to view details</p>
@@ -262,29 +222,20 @@
                 onAdd() {
                     const div = document.createElement('div');
                     div.className = 'pulse-marker';
-                    // Create the HTML structure for the glow effect
                     div.innerHTML = `<div class="pulse-ring"></div><div class="pulse-core"></div>`;
                     
-                    // === CLICK EVENT: REDIRECT TO ISSUE ===
                     div.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Prevent map click
-                        
-                        // 1. Find the card in the list
+                        e.stopPropagation(); 
                         const card = document.getElementById(`card-${this.id}`);
-                        
                         if(card) { 
-                            // 2. Scroll to the card smoothly
                             card.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
-                            
-                            // 3. Add highlighting effect
-                            card.classList.remove('highlight-card'); // Reset animation
-                            void card.offsetWidth; // Trigger reflow
-                            card.classList.add('highlight-card'); // Start animation
+                            card.classList.remove('highlight-card'); 
+                            void card.offsetWidth; 
+                            card.classList.add('highlight-card'); 
                         } else {
                             alert("Issue details are in the 'Active Incidents' tab.");
                         }
                     });
-
                     div.title = this.title;
                     this.div = div;
                     const panes = this.getPanes();
@@ -294,17 +245,9 @@
                     const overlayProjection = this.getProjection();
                     const pos = overlayProjection.fromLatLngToDivPixel(this.latlng);
                     const div = this.div;
-                    if(div) {
-                        div.style.left = pos.x + 'px';
-                        div.style.top = pos.y + 'px';
-                    }
+                    if(div) { div.style.left = pos.x + 'px'; div.style.top = pos.y + 'px'; }
                 }
-                onRemove() {
-                    if (this.div) {
-                        this.div.parentNode.removeChild(this.div);
-                        this.div = null;
-                    }
-                }
+                onRemove() { if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; } }
             }
             PulseMarkerClass = PulseMarker;
             syncData();
@@ -314,14 +257,8 @@
             const q = query(collection(db, "issues"), orderBy("timestamp", "desc"));
             onSnapshot(q, (snapshot) => {
                 reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                // 1. Update Counts
                 updateStats(); 
-                
-                // 2. Refresh Map Markers (Add/Remove based on status)
                 refreshMapPins();
-                
-                // 3. Render List (Important for redirection)
                 const activePage = document.querySelector('.page-section.active').id.split('-')[0];
                 if(activePage === 'stats') renderStatsList();
                 else if(activePage === 'feed') renderAdminFeed();
@@ -329,18 +266,12 @@
             });
         }
 
-        // === MAP PIN LOGIC ===
         let markers = [];
         function refreshMapPins() {
             if(!adminMap || !PulseMarkerClass) return;
-            
-            // Clear old markers
             markers.forEach(m => m.setMap(null)); 
             markers = [];
-
-            // FILTER: Only show markers for Unresolved issues
             const pendingIssues = reports.filter(r => r.status !== 'Resolved' && r.locationLat && r.locationLng);
-            
             pendingIssues.forEach(r => {
                 const latLng = new google.maps.LatLng(r.locationLat, r.locationLng);
                 const marker = new PulseMarkerClass(latLng, r.title, r.id);
@@ -352,8 +283,6 @@
         function renderStatsList() {
             const container = document.getElementById('stats-list-container');
             const pending = reports.filter(r => r.status !== 'Resolved');
-            
-            // Note: assigned id="card-${r.id}" to allow scrolling
             container.innerHTML = pending.map(r => `
                 <div id="card-${r.id}" class="bg-white p-4 rounded-2xl border shadow-sm flex gap-4 transition-all duration-300">
                     <img src="${r.imageUrl}" class="w-20 h-20 rounded-xl object-cover bg-slate-100">
@@ -369,7 +298,6 @@
             ).join('') || `<div class="col-span-2 text-center text-slate-400 p-4 border border-dashed rounded-2xl">No Pending Issues 🎉</div>`;
         }
 
-        // --- Other Render Functions (Feed, Lists) ---
         function renderAdminFeed() {
             const container = document.getElementById('admin-feed-container');
             if(!container) return;
@@ -377,14 +305,30 @@
 
             reports.forEach(r => {
                 if(r.isPrivate) return;
+                
+                // --- 🤖 AI BADGE LOGIC START ---
+                let aiBadgeHTML = "";
+                if (r.ai_reason) { 
+                    if (r.ai_is_genuine === true) {
+                        aiBadgeHTML = `<div class="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-lg"><i class="fas fa-robot text-emerald-600"></i><span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">AI Verified</span></div>`;
+                    } else {
+                        aiBadgeHTML = `<div class="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-red-50 border border-red-200 rounded-lg"><i class="fas fa-exclamation-triangle text-red-600"></i><span class="text-[10px] font-bold text-red-700 uppercase tracking-wide">AI Flag: ${r.ai_reason}</span></div>`;
+                    }
+                }
+                // --- 🤖 AI BADGE LOGIC END ---
+
                 let resolutionHTML = r.status === "Resolved" && r.fixedImageUrl ? `<div class="mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100"><p class="text-xs font-bold text-emerald-600 mb-2"><i class="fas fa-check-circle"></i> Resolution Proof (After)</p><img src="${r.fixedImageUrl}" class="w-full h-48 object-cover rounded-lg"></div>` : "";
+                
                 container.innerHTML += `
                 <div class="bg-white p-6 rounded-[2rem] border shadow-sm mb-6">
                     <div class="flex justify-between items-start mb-4">
                         <div><span class="bg-blue-100 text-blue-600 text-[10px] font-bold px-3 py-1 rounded-full uppercase">${r.category}</span><h3 class="text-lg font-bold mt-2">${r.title}</h3></div>
                         <span class="text-[10px] font-bold text-slate-400">${r.dateDisplay || 'Just now'}</span>
                     </div>
-                    <p class="text-sm text-slate-600 mb-3">${r.description}</p>
+                    
+                    ${aiBadgeHTML} 
+
+                    <p class="text-sm text-slate-600 mt-3 mb-3">${r.description}</p>
                     <img src="${r.imageUrl}" class="w-full h-56 object-cover rounded-2xl mb-4 bg-slate-100 border">
                     ${resolutionHTML}
                     <div class="flex justify-between items-center pt-2 border-t mt-2">
@@ -425,6 +369,28 @@
             let filtered = reports.filter(r => type === 'Pending' ? r.status !== 'Resolved' : r.status === 'Resolved');
             
             container.innerHTML = filtered.map(r => {
+                
+                // --- 🤖 AI BADGE LOGIC START ---
+                let aiBadgeHTML = "";
+                if (r.ai_reason) { 
+                    if (r.ai_is_genuine === true) {
+                        // GENUINE: Green Robot Badge
+                        aiBadgeHTML = `
+                        <div class="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <i class="fas fa-robot text-emerald-600"></i>
+                            <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">AI Verified: Genuine</span>
+                        </div>`;
+                    } else {
+                        // FAKE: Red Warning Badge
+                        aiBadgeHTML = `
+                        <div class="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-red-50 border border-red-200 rounded-lg">
+                            <i class="fas fa-exclamation-triangle text-red-600"></i>
+                            <span class="text-[10px] font-bold text-red-700 uppercase tracking-wide">AI Flag: ${r.ai_reason}</span>
+                        </div>`;
+                    }
+                }
+                // --- 🤖 AI BADGE LOGIC END ---
+
                 let ratingHTML = "";
                 if(type === 'Resolved') {
                     if(r.userRating) {
@@ -441,7 +407,10 @@
                     <div class="flex-1">
                         <div class="flex justify-between items-start mb-2"><span class="text-[9px] font-black uppercase tracking-tighter bg-slate-100 px-3 py-1 rounded-full">${r.category}</span><span class="text-[10px] font-bold ${r.status === 'Resolved' ? 'text-emerald-500' : 'text-amber-500'} uppercase">${r.status}</span></div>
                         <h3 class="text-lg font-black text-slate-800">${r.title}</h3>
-                        <p class="text-xs text-slate-500 mt-1 mb-4">${r.description}</p>
+                        
+                        ${aiBadgeHTML}
+
+                        <p class="text-xs text-slate-500 mt-2 mb-4">${r.description}</p>
                         <div class="flex items-center gap-3 pt-4 border-t border-slate-50"><span class="text-[10px] font-bold text-slate-400 uppercase">By: ${r.studentName}</span><div class="flex-1"></div>${type === 'Pending' ? `<button onclick="openResolveModal('${r.id}')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition">Mark Done</button>` : `<span class="text-emerald-500 font-black text-[10px] uppercase flex items-center gap-1"><i class="fas fa-check-circle"></i> Verified</span>`}</div>
                         ${ratingHTML}
                     </div>
@@ -450,7 +419,6 @@
             }).join('') || `<div class="p-10 text-center text-slate-400 font-bold uppercase text-xs">Queue Empty</div>`;
         }
 
-        // === RESOLVE LOGIC ===
         let activeResImage = null;
         function compressImage(file) { return new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const maxWidth = 800; const scale = maxWidth/img.width; canvas.width = maxWidth; canvas.height = img.height*scale; canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height); resolve(canvas.toDataURL('image/jpeg', 0.7)); }; }; }); }
         window.openResolveModal = (id) => { document.getElementById('target-issue-id').value = id; document.getElementById('res-modal').classList.remove('hidden'); };
@@ -462,18 +430,11 @@
             e.preventDefault(); 
             const id = document.getElementById('target-issue-id').value; 
             const btn = document.getElementById('btn-submit-fix'); 
-            
             if(!activeResImage) return alert("Photo Proof Required!"); 
-            
-            btn.innerText = "Processing..."; 
-            btn.disabled = true; 
-            
+            btn.innerText = "Processing..."; btn.disabled = true; 
             try { 
                 await updateDoc(doc(db, "issues", id), { status: "Resolved", fixedImageUrl: activeResImage, resolvedAt: new Date() }); 
-                alert("Resolved!"); 
-                closeModal(); 
-                document.getElementById('res-preview').classList.add('hidden'); 
-                activeResImage = null; 
+                alert("Resolved!"); closeModal(); document.getElementById('res-preview').classList.add('hidden'); activeResImage = null; 
             } catch (err) { alert(err.message); } 
             finally { btn.innerText = "Submit Fix"; btn.disabled = false; } 
         };
@@ -496,9 +457,8 @@
             document.getElementById('nav-' + pageId).classList.add('active');
             document.getElementById('header-title').innerText = pageId.charAt(0).toUpperCase() + pageId.slice(1) + " Overview";
             
-            // Map Resize Fix when becoming visible
             if(pageId === 'stats' && adminMap) {
-                renderStatsList(); // Re-render list
+                renderStatsList(); 
                 setTimeout(() => google.maps.event.trigger(adminMap, 'resize'), 300);
             }
             if(pageId === 'feed') renderAdminFeed();
@@ -508,10 +468,8 @@
         window.handleLogout = async function() { await signOut(auth); localStorage.removeItem('mnnit_current_user'); window.location.href = 'login.html'; };
         const session = JSON.parse(localStorage.getItem('mnnit_current_user'));
         
-        // Simple Auth Check
         if (!session || session.role !== 'admin') {
-            // Uncomment in production:
-            // window.location.href = 'login.html';
+            // Uncomment in production: window.location.href = 'login.html';
             console.log("Not logged in as admin (Dev Mode)");
         } else { 
             currentUser = session; document.getElementById('admin-name').innerText = session.email.split('@')[0]; 

@@ -7,6 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
     
     <style>
         /* IMPORT VINTAGE SANS-SERIF FONT */
@@ -258,7 +266,7 @@
             </section>
 
             <section id="profile-page" class="page-section">
-                <div class="vintage-card p-10 rounded-[2rem] max-w-4xl mx-auto">
+                 <div class="vintage-card p-10 rounded-[2rem] max-w-4xl mx-auto">
                     <div class="bg-[#2d2a26] text-[#e6e2dd] p-8 rounded-2xl mb-10 relative overflow-hidden border border-[#3e3b38]">
                         <div class="relative z-10 flex flex-col md:flex-row gap-8 items-center">
                             <div class="relative group cursor-pointer w-32 h-32" onclick="document.getElementById('profile-pic-input').click()">
@@ -323,6 +331,7 @@
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA45q-hu_MJph1n_0uuJd42G8QRT7bg8RI&callback=initMap" async defer></script>
 
     <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, serverTimestamp, updateDoc, arrayUnion, arrayRemove, orderBy, increment } 
@@ -341,12 +350,28 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // 🔴 YOUR KEY
+        const GEMINI_API_KEY = "AIzaSyCzoUQrbAgz0-FmKyYBoznU_DRkR5cMM-I"; 
+        
+        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+        // Using Flash with low temperature for maximum strictness
+        const aiModel = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: {
+                temperature: 0.1, // Very low creativity
+                topP: 0.1,
+                topK: 1
+            }
+        });
+
         let currentUser = null;
         let userProfile = null;
         let currentUploadedImage = null;
         let newProfilePic = null;
         let map, marker, currentLat = 25.4913, currentLng = 81.8667;
         let issuesChart = null;
+
+        // ... [Keep your initMap, toggleDarkMode, DOMContentLoaded functions exactly as they are] ...
 
         window.toggleDarkMode = function() {
             const isDark = document.getElementById('dark-mode-toggle').checked;
@@ -359,7 +384,6 @@
             const mnnitCenter = { lat: 25.4913, lng: 81.8667 };
             const MNNIT_BOUNDS = { north: 25.5050, south: 25.4800, west: 81.8550, east: 81.8800 };
             try {
-                // VINTAGE MAP STYLE
                 const vintageMapStyle = [
                     { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
                     { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
@@ -404,6 +428,126 @@
             fetchChartData();
         });
 
+
+        // 🚀 THIS IS THE FIXED SUBMIT LOGIC 🚀
+        document.getElementById('complaintForm').onsubmit = async (e) => { 
+            e.preventDefault(); 
+            if(!currentUploadedImage) return alert("Photo required!"); 
+            
+            const btn = document.getElementById('btn-submit-report'); 
+            const isPrivate = document.getElementById('comp-private').checked;
+            const titleVal = document.getElementById('comp-title').value;
+            const descVal = document.getElementById('comp-desc').value;
+
+            btn.innerText = "Running AI Audit..."; 
+            btn.disabled = true; 
+
+            try { 
+                let aiResult = { is_genuine: false, reason: "Check failed", visible_objects: "Unknown" }; 
+                
+                try {
+                    // --- 🔴 THE STRICT PROMPT ---
+                    const prompt = `
+                    You are a STRICT Spam Detection Filter for a college admin. 
+                    Your job is to REJECT images that do not explicitly match the report.
+                    
+                    REPORT DETAILS:
+                    Title: "${titleVal}"
+                    Description: "${descVal}"
+                    
+                    TASK:
+                    1. IDENTIFY: What specific objects are visible in the image? (e.g., "A selfie of a boy", "A meme", "A broken chair", "A screenshot").
+                    2. COMPARE: Does the image specifically show the issue described?
+                    
+                    STRICT RULES FOR "FALSE":
+                    - If image shows a Human Face / Selfie -> FALSE.
+                    - If image is a Screenshot of text/chat -> FALSE.
+                    - If image is a Meme/Cartoon -> FALSE.
+                    - If image is blurry/black/unclear -> FALSE.
+                    - If title is "Broken Fan" but image shows "A floor" -> FALSE.
+                    - If the connection is vague (e.g. "I am in the room") -> FALSE.
+                    
+                    ONLY return "TRUE" if you clearly see the damaged/reported object.
+
+                    Return JSON:
+                    {
+                      "visible_objects": "string description",
+                      "is_genuine": boolean,
+                      "reason": "very short verdict"
+                    }
+                    `;
+
+                    const base64Data = currentUploadedImage.split(',')[1];
+                    
+                    const result = await aiModel.generateContent([
+                        prompt,
+                        { inlineData: { data: base64Data, mimeType: "image/jpeg" } }
+                    ]);
+                    
+                    const text = result.response.text().replace(/```json|```/g, "").trim();
+                    aiResult = JSON.parse(text);
+                    console.log("Strict AI Audit:", aiResult); 
+
+                } catch (err) {
+                    console.error("AI Error:", err);
+                    // Default to FALSE if AI fails (Safety First)
+                    aiResult.reason = "AI Verification Failed";
+                }
+
+                const freshUser = (await getDoc(doc(db, "users", currentUser.uid))).data();
+                
+                await addDoc(collection(db, "issues"), { 
+                    studentId: currentUser.uid, 
+                    studentName: freshUser.fullName||"Student", 
+                    authorPic: freshUser.profilePic || null, 
+                    authorBadge: getBadgeIcon(freshUser.points || 0), 
+                    title: titleVal, 
+                    category: document.getElementById('comp-category').value, 
+                    description: descVal, 
+                    imageUrl: currentUploadedImage, 
+                    locationLat: currentLat, 
+                    locationLng: currentLng, 
+                    status: "Pending", 
+                    isPrivate: isPrivate, 
+                    
+                    // SAVE AI METADATA
+                    ai_is_genuine: aiResult.is_genuine,
+                    ai_reason: aiResult.reason,
+                    ai_detected_objects: aiResult.visible_objects || "Analysis failed",
+
+                    repostedBy: [], 
+                    upvotedBy: [], 
+                    downvotedBy: [], 
+                    timestamp: serverTimestamp(), 
+                    dateDisplay: new Date().toLocaleDateString() 
+                }); 
+
+                await updateDoc(doc(db, "users", currentUser.uid), { points: increment(10), reportCount: increment(1) }); 
+                
+                // Show user the result
+                const statusMsg = aiResult.is_genuine ? "✅ Verified" : "⚠️ Flagged by AI";
+                alert(`Report Submitted! [${statusMsg}]`); 
+                
+                document.getElementById('complaintForm').reset(); 
+                document.getElementById('image-preview').classList.add('hidden'); 
+                currentUploadedImage = null; 
+                
+                userProfile = (await getDoc(doc(db, "users", currentUser.uid))).data(); 
+                updateUI(userProfile); 
+                showPage('feed'); 
+                fetchChartData(); 
+
+            } catch(e){ 
+                alert("Error: " + e.message); 
+            } finally { 
+                btn.innerText = "Submit Report"; 
+                btn.disabled = false; 
+            } 
+        };
+
+        // ... [Keep the rest of your helper functions exactly as they are] ...
+        // (toggleNotifications, checkNotifications, updateUI, getBadgeIcon, compressImage, etc.)
+        
         window.toggleNotifications = function() {
             const menu = document.getElementById('notif-menu');
             const dot = document.getElementById('notif-dot');
@@ -453,13 +597,11 @@
             document.getElementById('edit-gender').value = profile.gender || "";
             document.getElementById('edit-mobile').value = profile.mobile || "";
             
-            // --- LEVEL & PROGRESS LOGIC ---
             let level="Rookie", badgeIcon="🐣", progress="10%", nextThreshold=50;
             if(points>=50) { level="Scout"; badgeIcon="🦅"; progress="33%"; nextThreshold=150; }
             if(points>=150) { level="Guardian"; badgeIcon="🛡️"; progress="66%"; nextThreshold=500; }
             if(points>=500) { level="Legend"; badgeIcon="👑"; progress="100%"; nextThreshold=1000; }
             
-            // Calculate remaining points
             let needed = nextThreshold - points;
             let tooltipText = `${points} / ${nextThreshold} Points (${needed} to ${points >= 500 ? 'Max Rank' : 'Next Level'})`;
             if(points >= 500) tooltipText = "Max Rank Achieved! (Legend Status)";
@@ -470,9 +612,8 @@
             document.getElementById('header-badge').innerText = badgeIcon;
             document.getElementById('progress-tooltip-text').innerText = tooltipText;
 
-            // --- BADGES COLLECTION LOGIC ---
             const badgeList = [
-                { name: "New Contributor", icon: "fas fa-paper-plane", text: "Joined the portal", unlocked: true }, // Always true
+                { name: "New Contributor", icon: "fas fa-paper-plane", text: "Joined the portal", unlocked: true }, 
                 { name: "First Report", icon: "fas fa-camera", text: "Posted 1st issue", unlocked: reportCount > 0 },
                 { name: "Civic Scout", icon: "fas fa-binoculars", text: "Earned 50 Karma", unlocked: points >= 50 },
                 { name: "Guardian", icon: "fas fa-shield-alt", text: "Earned 150 Karma", unlocked: points >= 150 },
@@ -488,7 +629,6 @@
                 if(b.unlocked) earnedCount++;
                 const colorClass = b.unlocked ? "bg-[#fdfbf7] border-[#d4a373] text-[#c0583d]" : "bg-[#e8e4da] border-[#dcd7cd] text-[#a8a4a0] locked";
                 const iconColor = b.unlocked ? "text-[#c0583d]" : "text-[#a8a4a0]";
-                
                 badgesContainer.innerHTML += `
                 <div class="badge-item ${colorClass} p-4 rounded-xl border-2 flex flex-col items-center text-center shadow-sm">
                     <div class="bg-[#f4f1ea] w-12 h-12 rounded-full flex items-center justify-center mb-2 border border-[#dcd7cd]">
@@ -501,44 +641,16 @@
             document.getElementById('prof-badges-count').innerText = earnedCount;
         }
 
-        function getBadgeIcon(p) {
-            if(p>=500) return '👑'; if(p>=150) return '🛡️'; if(p>=50) return '🦅'; return '🐣';
-        }
-
+        function getBadgeIcon(p) { if(p>=500) return '👑'; if(p>=150) return '🛡️'; if(p>=50) return '🦅'; return '🐣'; }
         function compressImage(file) { return new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const maxWidth = 800; const scale = maxWidth/img.width; canvas.width = maxWidth; canvas.height = img.height*scale; canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height); resolve(canvas.toDataURL('image/jpeg', 0.7)); }; }; }); }
+        
         document.getElementById('profile-pic-input').onchange = async (e) => { if(e.target.files[0]) { newProfilePic = await compressImage(e.target.files[0]); document.getElementById('profile-avatar-big').src = newProfilePic; } };
         document.getElementById('profile-edit-form').onsubmit = async (e) => { e.preventDefault(); const btn = document.getElementById('btn-save-profile'); btn.innerText = "Saving..."; btn.disabled = true; const updates = { branch: document.getElementById('edit-branch').value, year: document.getElementById('edit-year').value, gender: document.getElementById('edit-gender').value, mobile: document.getElementById('edit-mobile').value }; if (newProfilePic) updates.profilePic = newProfilePic; try { await updateDoc(doc(db, "users", currentUser.uid), updates); userProfile = (await getDoc(doc(db, "users", currentUser.uid))).data(); updateUI(userProfile); alert("Updated!"); } catch(e){ alert(e.message); } finally { btn.innerText = "Save Changes"; btn.disabled = false; } };
 
         document.getElementById('image-upload-area').onclick = () => document.getElementById('comp-image').click();
         document.getElementById('comp-image').onchange = async (e) => { currentUploadedImage = await compressImage(e.target.files[0]); document.getElementById('image-preview').src = currentUploadedImage; document.getElementById('image-preview').classList.remove('hidden'); };
         
-        document.getElementById('complaintForm').onsubmit = async (e) => { 
-            e.preventDefault(); if(!currentUploadedImage) return alert("Photo required!"); 
-            const btn = document.getElementById('btn-submit-report'); const isPrivate = document.getElementById('comp-private').checked;
-            btn.innerText = "Posting..."; btn.disabled = true; 
-            try { 
-                const freshUser = (await getDoc(doc(db, "users", currentUser.uid))).data();
-                await addDoc(collection(db, "issues"), { 
-                    studentId: currentUser.uid, studentName: freshUser.fullName||"Student", 
-                    authorPic: freshUser.profilePic || null, authorBadge: getBadgeIcon(freshUser.points || 0), 
-                    title: document.getElementById('comp-title').value, category: document.getElementById('comp-category').value, description: document.getElementById('comp-desc').value, imageUrl: currentUploadedImage, locationLat: currentLat, locationLng: currentLng, status: "Pending", isPrivate: isPrivate, 
-                    repostedBy: [], 
-                    upvotedBy: [], downvotedBy: [], timestamp: serverTimestamp(), dateDisplay: new Date().toLocaleDateString() 
-                }); 
-                await updateDoc(doc(db, "users", currentUser.uid), { points: increment(10), reportCount: increment(1) }); 
-                alert("Posted! +10 Karma"); document.getElementById('complaintForm').reset(); document.getElementById('image-preview').classList.add('hidden'); currentUploadedImage = null; 
-                userProfile = (await getDoc(doc(db, "users", currentUser.uid))).data(); updateUI(userProfile); showPage('feed'); fetchChartData(); 
-            } catch(e){ alert(e.message); } finally { btn.innerText = "Submit Report"; btn.disabled = false; } 
-        };
-
-        window.handleRepost = async function(docId) {
-            const ref = doc(db, "issues", docId);
-            const d = (await getDoc(ref)).data();
-            const u = currentUser.uid;
-            let update = d.repostedBy?.includes(u) ? { repostedBy: arrayRemove(u) } : { repostedBy: arrayUnion(u) };
-            await updateDoc(ref, update);
-            renderFeed();
-        }
+        window.handleRepost = async function(docId) { const ref = doc(db, "issues", docId); const d = (await getDoc(ref)).data(); const u = currentUser.uid; let update = d.repostedBy?.includes(u) ? { repostedBy: arrayRemove(u) } : { repostedBy: arrayUnion(u) }; await updateDoc(ref, update); renderFeed(); }
 
         async function renderFeed() {
             const container = document.getElementById('feed-container'); container.innerHTML = '<p class="text-center text-[#a8a4a0]">Loading feed...</p>';
@@ -549,15 +661,11 @@
                     const docId = docSnap.id; 
                     const score = (r.upvotedBy?.length || 0) - (r.downvotedBy?.length || 0); 
                     const isUp = r.upvotedBy?.includes(currentUser.uid), isDown = r.downvotedBy?.includes(currentUser.uid);
-                    
                     const repostCount = r.repostedBy ? r.repostedBy.length : 0;
                     const isReposted = r.repostedBy?.includes(currentUser.uid);
-
                     let displayPic = r.authorPic; let displayBadge = r.authorBadge;
                     if (r.studentId === currentUser.uid) { displayPic = userProfile.profilePic; displayBadge = getBadgeIcon(userProfile.points || 0); }
                     const finalAvatar = displayPic || `https://ui-avatars.com/api/?name=${r.studentName}&background=a8a4a0&color=2d2a26&bold=true`;
-                    const finalBadge = displayBadge || '🐣';
-
                     let resolutionHTML = r.status === "Resolved" && r.fixedImageUrl ? `<div class="mt-4 p-3 bg-green-50 rounded-xl border border-green-200"><p class="text-xs font-bold text-green-700 mb-2"><i class="fas fa-check-circle"></i> Resolution Proof (After)</p><img src="${r.fixedImageUrl}" class="w-full h-48 object-cover rounded-lg"></div>` : "";
                     
                     container.innerHTML += `
@@ -565,10 +673,9 @@
                         <div class="flex justify-between items-start mb-4"><div><span class="bg-[#4a6fa5] text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">${r.category}</span><h3 class="text-lg font-bold mt-2 text-[#2d2a26]">${r.title}</h3></div><span class="text-[10px] font-bold text-[#a8a4a0]">${r.dateDisplay}</span></div>
                         <p class="text-sm text-[#5c5855] mb-3 leading-relaxed font-medium">${r.description}</p>
                         <div class="relative"><img src="${r.imageUrl}" class="w-full h-56 object-cover rounded-lg mb-4 bg-[#f4f1ea] border border-[#dcd7cd]"></div> ${resolutionHTML}
-                        
                         <div class="flex justify-between items-center pt-2 border-t border-[#dcd7cd] mt-2">
                             <div class="flex items-center gap-2">
-                                <div class="avatar-container"><img src="${finalAvatar}" class="w-8 h-8 rounded-full object-cover border border-[#dcd7cd]"><div class="avatar-badge-mini">${finalBadge}</div></div>
+                                <div class="avatar-container"><img src="${finalAvatar}" class="w-8 h-8 rounded-full object-cover border border-[#dcd7cd]"><div class="avatar-badge-mini">${displayBadge||'🐣'}</div></div>
                                 <span class="text-xs font-bold text-[#5c5855]">${r.studentName}</span>
                             </div>
                             <div class="flex items-center gap-3">
@@ -588,114 +695,41 @@
             } catch(e){console.error(e);}
         }
 
-        async function loadMyReposts() {
-            const container = document.getElementById('reposts-container');
-            container.innerHTML = '<p class="text-center text-[#a8a4a0]">Loading reposts...</p>';
-            try {
-                const q = query(collection(db, "issues"), where("repostedBy", "array-contains", currentUser.uid));
-                const s = await getDocs(q);
-                if(s.empty) { container.innerHTML = `<p class="text-center text-[#a8a4a0] text-sm">You haven't reposted anything yet.</p>`; return; }
-                container.innerHTML = "";
-                s.forEach(docSnap => {
-                    const r = docSnap.data();
-                    container.innerHTML += `
-                    <div class="vintage-card p-6 rounded-2xl flex flex-col md:flex-row gap-6 mb-4">
-                        <img src="${r.imageUrl}" class="w-24 h-24 rounded-lg object-cover bg-[#f4f1ea] border border-[#dcd7cd]">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="bg-green-100 text-green-700 border border-green-200 text-[9px] font-bold px-2 py-1 rounded-full uppercase"><i class="fas fa-retweet"></i> Reposted</span>
-                                <span class="text-[10px] font-bold text-[#a8a4a0]">${r.dateDisplay}</span>
-                            </div>
-                            <h3 class="text-lg font-bold text-[#2d2a26]">${r.title}</h3>
-                            <p class="text-xs text-[#5c5855] mt-1 line-clamp-2">${r.description}</p>
-                            <div class="flex items-center gap-2 mt-3">
-                                <img src="https://ui-avatars.com/api/?name=${r.studentName}&background=a8a4a0&color=2d2a26" class="w-5 h-5 rounded-full">
-                                <span class="text-[10px] font-bold text-[#a8a4a0]">Original by ${r.studentName}</span>
-                            </div>
-                        </div>
-                    </div>`;
-                });
-            } catch(e) { console.error(e); }
-        }
-
         window.handleVote = async function(docId, type) { const ref = doc(db, "issues", docId); const d = (await getDoc(ref)).data(); const u = currentUser.uid; let up = {}; if(type==='up') up = d.upvotedBy?.includes(u)?{upvotedBy:arrayRemove(u)}:{upvotedBy:arrayUnion(u),downvotedBy:arrayRemove(u)}; else up = d.downvotedBy?.includes(u)?{downvotedBy:arrayRemove(u)}:{downvotedBy:arrayUnion(u),upvotedBy:arrayRemove(u)}; await updateDoc(ref, up); renderFeed(); }
         window.toggleComments = (id) => { const el=document.getElementById(`comments-${id}`); if(el.classList.contains('open'))el.classList.remove('open'); else { el.classList.add('open'); loadComments(id); } };
         async function loadComments(id) { const d = document.getElementById(`list-${id}`); d.innerHTML='Loading...'; const q = query(collection(db, "issues", id, "comments"), orderBy("timestamp", "asc")); const s = await getDocs(q); d.innerHTML=""; if(s.empty){d.innerHTML='No comments.';return;} 
             s.forEach(c => { 
-                const dt=c.data(); 
-                const isOfficial = dt.isAdmin;
+                const dt=c.data(); const isOfficial = dt.isAdmin;
                 const bubbleClass = isOfficial ? "bg-[#2d2a26] text-[#e6e2dd] border-[#4a6fa5] border-l-4" : "bg-white text-[#2d2a26] border-[#dcd7cd]";
                 const nameClass = isOfficial ? "text-[#4a6fa5]" : "text-[#2d2a26]";
                 const badge = isOfficial ? `<span class="bg-[#4a6fa5] text-[9px] text-white px-1.5 rounded ml-2">OFFICIAL</span>` : "";
-
-                let commPic = dt.authorPic; let commBadge = dt.authorBadge;
-                if(dt.authorId === currentUser.uid && !isOfficial) { commPic = userProfile.profilePic; commBadge = getBadgeIcon(userProfile.points || 0); }
-                if(isOfficial) commPic = "https://ui-avatars.com/api/?name=CW&background=1e293b&color=fff&bold=true"; 
-
-                const finalCommPic = commPic || `https://ui-avatars.com/api/?name=${dt.authorName}&background=a8a4a0&color=fff&size=32&bold=true`;
-                
-                d.innerHTML += `
-                <div class="flex gap-3">
-                    <div class="avatar-container"><img src="${finalCommPic}" class="w-8 h-8 rounded-full object-cover border border-[#dcd7cd]"><div class="avatar-badge-mini">${commBadge||(isOfficial?'👮':'🐣')}</div></div>
-                    <div class="flex-1">
-                        <div class="${bubbleClass} p-3 rounded-xl shadow-sm inline-block w-full border">
-                            <div class="flex items-center mb-1"><span class="text-xs font-bold ${nameClass}">${dt.authorName}</span>${badge}</div>
-                            <p class="text-sm font-medium">${dt.text}</p>
-                        </div>
-                    </div>
-                </div>`; 
+                const finalCommPic = dt.authorPic || `https://ui-avatars.com/api/?name=${dt.authorName}&background=a8a4a0&color=fff&size=32&bold=true`;
+                d.innerHTML += `<div class="flex gap-3"><div class="avatar-container"><img src="${finalCommPic}" class="w-8 h-8 rounded-full object-cover border border-[#dcd7cd]"><div class="avatar-badge-mini">${dt.authorBadge||(isOfficial?'👮':'🐣')}</div></div><div class="flex-1"><div class="${bubbleClass} p-3 rounded-xl shadow-sm inline-block w-full border"><div class="flex items-center mb-1"><span class="text-xs font-bold ${nameClass}">${dt.authorName}</span>${badge}</div><p class="text-sm font-medium">${dt.text}</p></div></div></div>`; 
             }); 
         }
         
-        window.postComment = async(id) => { 
-            const i=document.getElementById(`input-${id}`); if(!i.value.trim())return; 
-            const latestUser = (await getDoc(doc(db, "users", currentUser.uid))).data();
-            await addDoc(collection(db,"issues",id,"comments"),{text:i.value.trim(),authorId:currentUser.uid,authorName:latestUser?.fullName||"Student", authorPic: latestUser.profilePic || null, authorBadge: getBadgeIcon(latestUser.points||0), timestamp:serverTimestamp(),upvotedBy:[],downvotedBy:[]}); i.value=""; loadComments(id); 
-        };
-        window.voteComment = async(iId, cId, type) => { const ref=doc(db,"issues",iId,"comments",cId); const d=(await getDoc(ref)).data(); const u=currentUser.uid; let up={}; if(type==='up') up=d.upvotedBy?.includes(u)?{upvotedBy:arrayRemove(u)}:{upvotedBy:arrayUnion(u),downvotedBy:arrayRemove(u)}; else up=d.downvotedBy?.includes(u)?{downvotedBy:arrayRemove(u)}:{downvotedBy:arrayUnion(u),upvotedBy:arrayRemove(u)}; await updateDoc(ref,up); loadComments(iId); };
-
+        window.postComment = async(id) => { const i=document.getElementById(`input-${id}`); if(!i.value.trim())return; const latestUser = (await getDoc(doc(db, "users", currentUser.uid))).data(); await addDoc(collection(db,"issues",id,"comments"),{text:i.value.trim(),authorId:currentUser.uid,authorName:latestUser?.fullName||"Student", authorPic: latestUser.profilePic || null, authorBadge: getBadgeIcon(latestUser.points||0), timestamp:serverTimestamp(),upvotedBy:[],downvotedBy:[]}); i.value=""; loadComments(id); };
+        
         async function loadMyHistory() { 
             const d = document.getElementById('history-container'); d.innerHTML='Loading...';
             const q=query(collection(db,"issues"),where("studentId","==",currentUser.uid)); const s=await getDocs(q); d.innerHTML=""; if(s.empty) {d.innerHTML='No reports.';return;}
             s.forEach(doc=>{
                 const r=doc.data(); 
                 let privateBadge = r.isPrivate ? `<span class="bg-[#e8e4da] text-[#5c5855] text-[10px] px-2 py-1 rounded border border-[#dcd7cd]"><i class="fas fa-lock"></i> Private</span>` : '';
-                
                 let ratingHTML = "";
                 if(r.status === "Resolved") {
                    if(r.userRating) {
-                      let stars = "";
-                      for(let i=1; i<=5; i++) stars += i <= r.userRating ? '<i class="fas fa-star text-[#d4a373]"></i>' : '<i class="far fa-star text-[#dcd7cd]"></i>';
+                      let stars = ""; for(let i=1; i<=5; i++) stars += i <= r.userRating ? '<i class="fas fa-star text-[#d4a373]"></i>' : '<i class="far fa-star text-[#dcd7cd]"></i>';
                       ratingHTML = `<div class="mt-2"><div class="flex gap-1 text-xs">${stars}</div><p class="text-[9px] text-[#a8a4a0] font-bold mt-1">You Rated</p></div>`;
                    } else {
-                      let stars = "";
-                      for(let i=1; i<=5; i++) stars += `<button onclick="submitRating('${doc.id}', ${i})" class="text-[#dcd7cd] hover:text-[#d4a373] transition"><i class="fas fa-star"></i></button>`;
+                      let stars = ""; for(let i=1; i<=5; i++) stars += `<button onclick="submitRating('${doc.id}', ${i})" class="text-[#dcd7cd] hover:text-[#d4a373] transition"><i class="fas fa-star"></i></button>`;
                       ratingHTML = `<div class="mt-2"><div class="flex gap-1 text-xs star-rating">${stars}</div><p class="text-[9px] text-[#4a6fa5] font-bold mt-1 cursor-pointer">Rate Fix</p></div>`;
                    }
                 }
-
-                d.innerHTML+=`
-                <div class="vintage-card p-6 rounded-2xl flex gap-6 items-center">
-                    <img src="${r.imageUrl}" class="w-20 h-20 rounded-lg object-cover bg-[#f4f1ea] border border-[#dcd7cd]">
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <h3 class="text-lg font-bold text-[#2d2a26]">${r.title}</h3>
-                            ${privateBadge}
-                        </div>
-                        <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${r.status==='Resolved'?'text-green-700 bg-green-100 border border-green-200':'text-yellow-700 bg-yellow-100 border border-yellow-200'}">${r.status}</span>
-                        ${ratingHTML}
-                    </div>
-                </div>`;
+                d.innerHTML+=`<div class="vintage-card p-6 rounded-2xl flex gap-6 items-center"><img src="${r.imageUrl}" class="w-20 h-20 rounded-lg object-cover bg-[#f4f1ea] border border-[#dcd7cd]"><div><div class="flex items-center gap-2 mb-1"><h3 class="text-lg font-bold text-[#2d2a26]">${r.title}</h3>${privateBadge}</div><span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${r.status==='Resolved'?'text-green-700 bg-green-100 border border-green-200':'text-yellow-700 bg-yellow-100 border border-yellow-200'}">${r.status}</span>${ratingHTML}</div></div>`;
             }); 
         }
-
-        window.submitRating = async(docId, rating) => {
-             if(confirm(`Rate this resolution ${rating} stars?`)) {
-                 await updateDoc(doc(db, "issues", docId), { userRating: rating });
-                 loadMyHistory(); 
-             }
-        }
-        
+        window.submitRating = async(docId, rating) => { if(confirm(`Rate this resolution ${rating} stars?`)) { await updateDoc(doc(db, "issues", docId), { userRating: rating }); loadMyHistory(); } }
         async function fetchChartData() { try { const q=query(collection(db,"issues")); const s=await getDocs(q); let h=0,a=0,i=0,c=0; s.forEach(d=>{const v=d.data().category; if(v=='Hostel')h++;if(v=='Academic')a++;if(v=='Infrastructure')i++;if(v=='Cleanliness')c++;}); renderChart([h,a,i,c]); } catch(e){console.error(e);} }
         function renderChart(d){if(issuesChart)issuesChart.destroy(); const ctx=document.getElementById('resolvedIssuesChart').getContext('2d'); issuesChart=new Chart(ctx,{type:'bar',data:{labels:['Hostel','Academic','Infra','Cleanliness'],datasets:[{label:'Reports',data:d||[0,0,0,0],backgroundColor:['#4a6fa5','#c0583d','#d4a373','#8fa87a'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'#dcd7cd', borderDash:[5,5]}},x:{grid:{display:false}}}}});}
         
@@ -709,14 +743,13 @@
             const notifMenu = document.getElementById('notif-menu'), notifBtn = document.getElementById('notif-btn');
             const profileMenu = document.getElementById('profile-menu'), profileBtn = document.getElementById('profile-btn');
             const settingsModal = document.getElementById('settings-modal');
-
             if (notifMenu && !notifMenu.contains(e.target) && !notifBtn.contains(e.target)) notifMenu.classList.add('hidden');
             if (profileMenu && !profileMenu.contains(e.target) && !profileBtn.contains(e.target)) profileMenu.classList.add('hidden');
             if (settingsModal && !settingsModal.classList.contains('hidden') && e.target === settingsModal) settingsModal.classList.add('hidden');
         };
 
         window.toggleProfileMenu = () => document.getElementById('profile-menu').classList.toggle('hidden'); window.toggleSettingsModal = () => document.getElementById('settings-modal').classList.toggle('hidden'); window.handleLogout = async () => { await signOut(auth); localStorage.removeItem('mnnit_current_user'); window.location.href = 'login.html'; }; 
-        window.handleVote = handleVote; window.toggleComments = toggleComments; window.postComment = postComment; window.voteComment = voteComment; window.handleRepost = handleRepost; window.submitRating = submitRating;
+        window.handleVote = handleVote; window.toggleComments = toggleComments; window.postComment = postComment; window.handleRepost = handleRepost; window.submitRating = submitRating;
     </script>
 </body>
 </html>
