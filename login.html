@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MNNIT Reporter - Access</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* === VIDEO BACKGROUND === */
+        #bg-video {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -2; 
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2); 
+            z-index: -1; 
+        }
+
+        body { 
+            font-family: 'Poppins', sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+            overflow: hidden; 
+        }
+        
+        /* === GLOWING TRANSPARENT GLASS CARD === */
+        .auth-card { 
+            background: rgba(255, 255, 255, 0.05); /* Very slight tint for glass effect */
+            padding: 40px; 
+            border-radius: 24px; 
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            
+            /* The Glowing Border */
+            border: 1.5px solid rgba(37, 99, 235, 0.5); 
+            
+            /* Dual Shadow: One for depth, one for the outer glow */
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2), 
+                        0 0 20px rgba(37, 99, 235, 0.4);
+            
+            width: 100%; 
+            max-width: 420px; 
+            text-align: center; 
+            position: relative;
+            z-index: 1;
+            animation: pulse-glow 3s infinite ease-in-out;
+        }
+
+        /* Subtle pulsing animation for the glow */
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2), 0 0 15px rgba(37, 99, 235, 0.3); border-color: rgba(37, 99, 235, 0.4); }
+            50% { box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2), 0 0 30px rgba(37, 99, 235, 0.6); border-color: rgba(37, 99, 235, 0.8); }
+            100% { box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2), 0 0 15px rgba(37, 99, 235, 0.3); border-color: rgba(37, 99, 235, 0.4); }
+        }
+        
+        h2 { margin-top: 0; color: #ffffff; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        p { color: rgba(255, 255, 255, 0.8); font-size: 0.9rem; margin-bottom: 25px; }
+
+        input { 
+            width: 100%; 
+            padding: 12px 15px; 
+            margin-bottom: 15px; 
+            border: 1px solid rgba(255, 255, 255, 0.3); 
+            border-radius: 12px; 
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 0.95rem; 
+            transition: 0.3s; 
+        }
+        input::placeholder { color: rgba(255, 255, 255, 0.5); }
+        input:focus { 
+            border-color: #3b82f6; 
+            outline: none; 
+            background: rgba(255, 255, 255, 0.15); 
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; font-size: 1rem; }
+        .btn-primary { 
+            background: #2563eb; 
+            color: white; 
+            box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4); 
+        }
+        .btn-primary:hover { 
+            background: #3b82f6; 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.6);
+        }
+        
+        .btn-google { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            background: rgba(255, 255, 255, 0.95); 
+            color: #1f2937; 
+            margin-top: 15px; 
+        }
+
+        .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .role-card { 
+            background: rgba(255, 255, 255, 0.05); 
+            border: 1px solid rgba(255, 255, 255, 0.2); 
+            border-radius: 16px; 
+            padding: 20px 10px; 
+            cursor: pointer; 
+            transition: 0.3s; 
+            color: white;
+        }
+        .role-card:hover { 
+            background: rgba(37, 99, 235, 0.15); 
+            border-color: #3b82f6;
+            transform: scale(1.03);
+            box-shadow: 0 0 15px rgba(37, 99, 235, 0.3);
+        }
+        .role-icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+        .role-title { font-weight: 600; }
+
+        .hidden { display: none; }
+        .error-msg { color: #f87171; font-size: 0.85rem; margin-bottom: 10px; display: none; text-align: left;}
+        .back-btn { background: none; border: none; color: #ffffff; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; opacity: 0.7; }
+        .back-btn:hover { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <video autoplay muted loop playsinline preload="auto" id="bg-video">
+        <source src="video_4.mp4" type="video/mp4">
+        Your browser does not support HTML5 video.
+    </video>
+    
+    <div class="overlay"></div>
+
+    <div class="auth-card">
+        <div id="screen-selection">
+            <h2>Welcome Back</h2>
+            <p>Please select your role to continue</p>
+            <div class="role-grid">
+                <div class="role-card" onclick="selectRole('student')">
+                    <span class="role-icon">🎓</span>
+                    <span class="role-title">Student</span>
+                </div>
+                <div class="role-card" onclick="selectRole('admin')">
+                    <span class="role-icon">👮‍♂️</span>
+                    <span class="role-title">Admin</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="screen-admin" class="hidden">
+            <button class="back-btn" onclick="goBack()">← Back</button>
+            <h2>Admin Login</h2>
+            <p>Authorized personnel only</p>
+            <input type="email" id="admin-email" placeholder="Admin Email">
+            <input type="password" id="admin-pass" placeholder="Password">
+            <div id="admin-error" class="error-msg"></div>
+            <button class="btn btn-primary" onclick="handleAdminLogin()">Secure Login</button>
+        </div>
+
+        <div id="screen-student" class="hidden">
+            <button class="back-btn" onclick="goBack()">← Back</button>
+            <div id="student-login-view">
+                <h2>Student Access</h2>
+                <p>Use your college Google account to continue</p>
+                <button class="btn btn-google" onclick="handleGoogleLogin()">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18">
+                    Continue with Google
+                </button>
+            </div>
+
+            <div id="student-signup-form" class="hidden" style="margin-top: 20px;">
+                <div id="google-alert" style="background:rgba(52, 211, 153, 0.1); color:#34d399; padding:10px; border-radius:12px; margin-bottom:15px; font-size:0.85rem; border: 1px solid rgba(52, 211, 153, 0.3);">
+                    ✅ Verified via Google.
+                </div>
+                <input type="text" id="stu-name" placeholder="Full Name">
+                <input type="text" id="stu-reg-id" placeholder="Registration ID">
+                <input type="email" id="stu-email" placeholder="College Email" disabled>
+                <div id="stu-signup-error" class="error-msg"></div>
+                <button id="btn-register" class="btn btn-primary" style="background:#10b981;" onclick="handleStudentSignup()">Complete Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } 
+            from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } 
+            from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_HB6QXbdv5z6zKXIkU18nw7k9NFOmZ5s",
+            authDomain: "mnnit-devjam.firebaseapp.com",
+            projectId: "mnnit-devjam",
+            storageBucket: "mnnit-devjam.firebasestorage.app",
+            messagingSenderId: "860519154056",
+            appId: "1:860519154056:web:1f848fba6723b04419fa3d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        let isGoogleSignup = false;
+        let googleUserCache = null;
+
+        window.handleGoogleLogin = async function() {
+            try {
+                const result = await signInWithPopup(auth, googleProvider);
+                const user = result.user;
+                const docRef = doc(db, "users", user.uid);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    saveAndRedirect(user, 'student');
+                } else {
+                    googleUserCache = user;
+                    isGoogleSignup = true;
+                    document.getElementById('student-login-view').classList.add('hidden');
+                    document.getElementById('student-signup-form').classList.remove('hidden');
+                    document.getElementById('stu-name').value = user.displayName;
+                    document.getElementById('stu-email').value = user.email;
+                }
+            } catch (err) {
+                alert("Google Login Error: " + err.message);
+            }
+        }
+
+        window.handleStudentSignup = async function() {
+            const name = document.getElementById('stu-name').value;
+            const regId = document.getElementById('stu-reg-id').value;
+            const email = document.getElementById('stu-email').value;
+            const errorDiv = document.getElementById('stu-signup-error');
+            if(!name || !regId) { showError(errorDiv, "All fields required"); return; }
+            try {
+                await setDoc(doc(db, "users", googleUserCache.uid), {
+                    fullName: name, registrationId: regId, email: email, role: "student"
+                });
+                alert("Registration Successful!");
+                saveAndRedirect(googleUserCache, 'student');
+            } catch (err) {
+                showError(errorDiv, err.message);
+            }
+        }
+
+        window.handleAdminLogin = async function() {
+            const email = document.getElementById('admin-email').value;
+            const pass = document.getElementById('admin-pass').value;
+            const errorDiv = document.getElementById('admin-error');
+            if(!email || !pass) { showError(errorDiv, "Fill all fields"); return; }
+            try {
+                const cred = await signInWithEmailAndPassword(auth, email, pass);
+                const docSnap = await getDoc(doc(db, "users", cred.user.uid));
+                if (docSnap.exists() && docSnap.data().role === "admin") {
+                    saveAndRedirect(cred.user, 'admin');
+                } else {
+                    await signOut(auth);
+                    showError(errorDiv, "Access Denied. Not an Admin.");
+                }
+            } catch (err) {
+                showError(errorDiv, "Login Failed: " + err.message);
+            }
+        }
+
+        function saveAndRedirect(user, role) {
+            const sessionData = { email: user.email, role: role, uid: user.uid };
+            localStorage.setItem('mnnit_current_user', JSON.stringify(sessionData));
+            window.location.href = (role === 'admin') ? 'admin.html' : 'student.html';
+        }
+
+        function showError(element, msg) {
+            element.style.display = 'block';
+            element.innerText = msg;
+        }
+
+        window.selectRole = function(role) {
+            document.getElementById('screen-selection').classList.add('hidden');
+            if(role === 'admin') document.getElementById('screen-admin').classList.remove('hidden');
+            else document.getElementById('screen-student').classList.remove('hidden');
+        }
+
+        window.goBack = function() {
+            document.getElementById('screen-admin').classList.add('hidden');
+            document.getElementById('screen-student').classList.add('hidden');
+            document.getElementById('screen-selection').classList.remove('hidden');
+            document.getElementById('student-login-view').classList.remove('hidden');
+            document.getElementById('student-signup-form').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

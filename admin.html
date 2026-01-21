@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Civic Connect | Chief Warden Command</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        
+        .nav-link.active { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4); }
+        .page-section { display: none; }
+        .page-section.active { display: block; animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Highlight animation when map marker is clicked */
+        .highlight-card { animation: flashHighlight 2s ease-in-out; border: 2px solid #2563eb !important; scroll-margin-top: 100px; }
+        @keyframes flashHighlight { 
+            0% { background-color: #dbeafe; transform: scale(1); } 
+            20% { background-color: #bfdbfe; transform: scale(1.02); } 
+            100% { background-color: white; transform: scale(1); } 
+        }
+        
+        .stats-card { background: white; border: 1px solid #e2e8f0; border-radius: 2rem; }
+        #admin-map { height: 500px; width: 100%; border-radius: 1.5rem; }
+        
+        .comments-section { max-height: 0; overflow: hidden; transition: all 0.3s ease-out; opacity: 0; }
+        .comments-section.open { max-height: 500px; opacity: 1; margin-top: 15px; overflow-y: auto; }
+
+        .gm-err-container { display: none !important; }
+        .gm-style-pbc { opacity: 0 !important; }
+
+        /* === 🔴 GLOWING RED LIGHT MARKER CSS === */
+        .pulse-marker { position: absolute; width: 24px; height: 24px; cursor: pointer; transform: translate(-50%, -50%); z-index: 50; }
+        
+        /* The Core Red Light */
+        .pulse-core { 
+            width: 100%; height: 100%; 
+            background-color: #ef4444; /* Red-500 */
+            border-radius: 50%; 
+            border: 3px solid white; 
+            /* This creates the glowing LED effect */
+            box-shadow: 0 0 15px 4px rgba(239, 68, 68, 0.8); 
+            position: absolute; 
+            z-index: 2; 
+            transition: all 0.3s ease;
+        }
+
+        /* The Rippling Ring Animation */
+        .pulse-ring { 
+            position: absolute; top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            border-radius: 50%; 
+            border: 3px solid #ef4444; 
+            opacity: 0; 
+            z-index: 1; 
+            animation: ripple 2s infinite ease-out; 
+        }
+        
+        @keyframes ripple { 
+            0% { transform: scale(1); opacity: 1; } 
+            100% { transform: scale(4); opacity: 0; } 
+        }
+
+        /* Hover Effect */
+        .pulse-marker:hover .pulse-core { 
+            transform: scale(1.2); 
+            background-color: #dc2626; /* Red-600 */
+            box-shadow: 0 0 25px 8px rgba(220, 38, 38, 0.9); /* Stronger glow */
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-slate-900">
+
+    <aside class="w-80 bg-slate-900 text-white flex flex-col hidden lg:flex shadow-2xl">
+        <div class="p-8 text-2xl font-black flex items-center gap-3">
+            <div class="bg-blue-500 p-2.5 rounded-2xl shadow-lg shadow-blue-500/20">
+                <i class="fas fa-building-shield text-white text-sm"></i>
+            </div>
+            <span class="tracking-tighter">WardenPanel</span>
+        </div>
+        
+        <nav class="flex-1 p-6 space-y-3">
+            <button onclick="showPage('stats')" id="nav-stats" class="nav-link active flex items-center gap-4 p-4 w-full rounded-2xl transition-all font-bold text-left">
+                <i class="fas fa-chart-line"></i> Analytics Overview
+            </button>
+            <button onclick="showPage('feed')" id="nav-feed" class="nav-link flex items-center gap-4 p-4 w-full text-slate-400 hover:bg-slate-800 rounded-2xl transition-all font-bold text-left">
+                <i class="fas fa-stream"></i> Campus Feed
+            </button>
+            <button onclick="showPage('pending')" id="nav-pending" class="nav-link flex items-center gap-4 p-4 w-full text-slate-400 hover:bg-slate-800 rounded-2xl transition-all font-bold text-left">
+                <i class="fas fa-tower-broadcast"></i> Active Incidents
+            </button>
+            <button onclick="showPage('resolved')" id="nav-resolved" class="nav-link flex items-center gap-4 p-4 w-full text-slate-400 hover:bg-slate-800 rounded-2xl transition-all font-bold text-left">
+                <i class="fas fa-check-double"></i> Resolved Logs
+            </button>
+        </nav>
+
+        <div class="p-8 border-t border-slate-800">
+            <div class="bg-slate-800 p-5 rounded-2xl text-center border border-slate-700">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">SYSTEM TIME</p>
+                <span id="live-time" class="text-2xl font-mono font-black text-white">00:00:00</span>
+                <div class="flex items-center justify-center gap-2 mt-2">
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-[10px] font-bold text-emerald-500 uppercase">Online</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto scroll-smooth">
+        <header class="bg-white/80 backdrop-blur-md border-b px-10 py-4 flex justify-between items-center sticky top-0 z-50">
+            <div>
+                <h1 class="text-xl font-black text-slate-800" id="header-title">Analytics Overview</h1>
+                <p class="text-[11px] font-bold text-blue-600 uppercase tracking-widest">MNNIT Campus Management</p>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="text-right hidden sm:block">
+                    <p class="text-sm font-black text-slate-800" id="admin-name">Loading...</p>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded-lg inline-block">Chief Warden</p>
+                </div>
+                
+                <div class="relative">
+                    <button onclick="toggleProfileMenu()" class="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg shadow-lg hover:bg-blue-600 transition-colors">
+                        CW
+                    </button>
+                    
+                    <div id="profile-menu" class="hidden absolute right-0 top-14 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-50">
+                        <div class="px-4 py-2 border-b border-slate-50 mb-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Account</span>
+                        </div>
+                        <button onclick="handleLogout()" class="w-full text-left px-4 py-3 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition flex items-center gap-2">
+                            <i class="fas fa-sign-out-alt"></i> Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-10 max-w-7xl mx-auto">
+            
+            <section id="stats-page" class="page-section active">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <div class="stats-card p-8 shadow-sm border-l-4 border-l-slate-300">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Reports</p>
+                        <h2 id="count-total" class="text-4xl font-black text-slate-900">0</h2>
+                    </div>
+                    <div class="stats-card p-8 shadow-sm border-l-4 border-l-amber-400">
+                        <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Pending Actions</p>
+                        <h2 id="count-pending" class="text-4xl font-black text-amber-500">0</h2>
+                    </div>
+                    <div class="stats-card p-8 shadow-sm border-l-4 border-l-emerald-400">
+                        <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Resolutions</p>
+                        <h2 id="count-resolved" class="text-4xl font-black text-emerald-500">0</h2>
+                    </div>
+                </div>
+
+                <div class="stats-card p-6 shadow-xl mb-10 overflow-hidden relative">
+                    <h3 class="text-lg font-black mb-4 flex items-center gap-2"><i class="fas fa-map-marked-alt text-blue-500"></i> Live Unresolved Issues</h3>
+                    <div id="admin-map" class="bg-slate-100"></div>
+                    
+                    <div class="absolute top-20 right-10 bg-white/90 backdrop-blur px-4 py-3 rounded-xl shadow-lg border border-slate-200 z-10 text-xs">
+                        <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-red-500 border border-white box-shadow-glow"></span> <b>Critical (Pulsing)</b></div>
+                        <p class="text-[10px] text-slate-400 mt-1">Click a red light to view details</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-black mb-4">Quick Action Queue</h3>
+                <div id="stats-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </section>
+
+            <section id="feed-page" class="page-section">
+                <h2 class="text-2xl font-black mb-6 text-slate-800">📡 Live Campus Feed (Official View)</h2>
+                <div id="admin-feed-container" class="space-y-6"></div>
+            </section>
+
+            <section id="pending-page" class="page-section">
+                <div class="flex items-center justify-between mb-8">
+                    <h2 class="text-2xl font-black text-amber-600">⚠️ Active Incident Queue</h2>
+                    <select id="filter-priority" onchange="renderList('Pending')" class="px-4 py-2 bg-white border rounded-xl text-xs font-bold shadow-sm">
+                        <option value="all">All Priorities</option>
+                        <option value="high">Urgent Only</option>
+                    </select>
+                </div>
+                <div id="pending-list" class="space-y-6"></div>
+            </section>
+
+            <section id="resolved-page" class="page-section">
+                <h2 class="text-2xl font-black text-emerald-600 mb-8">✅ Completed Fixes History</h2>
+                <div id="resolved-list" class="space-y-6"></div>
+            </section>
+        </div>
+    </main>
+
+    <div id="res-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-6">
+        <div class="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl relative">
+            <button onclick="closeModal()" class="absolute top-6 right-8 text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
+            <h2 class="text-2xl font-black mb-2 text-center text-slate-800">Lodge Fix Proof</h2>
+            <p class="text-slate-400 text-sm mb-6 text-center">Upload the "After" photo to verify this repair.</p>
+            <form id="resolveForm" class="space-y-6">
+                <input type="hidden" id="target-issue-id">
+                <div id="res-upload-area" class="w-full py-12 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 transition-all">
+                    <i class="fas fa-camera text-3xl text-slate-300 mb-2"></i>
+                    <p class="text-[10px] font-black text-slate-500 uppercase">Click to upload photo (MANDATORY)</p>
+                    <input type="file" id="res-image-input" accept="image/*" class="hidden">
+                    <img id="res-preview" class="hidden mt-4 h-32 w-auto rounded-xl shadow-sm border">
+                </div>
+                <button type="submit" id="btn-submit-fix" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-blue-600 transition-all shadow-lg">Submit & Close Ticket</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA45q-hu_MJph1n_0uuJd42G8QRT7bg8RI&callback=initMap" async defer></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, doc, updateDoc, orderBy, addDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_HB6QXbdv5z6zKXIkU18nw7k9NFOmZ5s",
+            authDomain: "mnnit-devjam.firebaseapp.com",
+            projectId: "mnnit-devjam",
+            storageBucket: "mnnit-devjam.firebasestorage.app",
+            messagingSenderId: "860519154056",
+            appId: "1:860519154056:web:1f848fba6723b04419fa3d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        let reports = [];
+        let adminMap, PulseMarkerClass;
+        let currentUser = null;
+
+        // === GOOGLE MAP INITIALIZATION ===
+        window.initMap = function() {
+            const mnnitCenter = { lat: 25.4913, lng: 81.8667 };
+            adminMap = new google.maps.Map(document.getElementById("admin-map"), {
+                center: mnnitCenter, zoom: 16, mapTypeControl: false, streetViewControl: false,
+                styles: [{ "featureType": "poi", "stylers": [{ "visibility": "off" }] }]
+            });
+
+            // === 🔴 CUSTOM OVERLAY CLASS (The Red Light) ===
+            class PulseMarker extends google.maps.OverlayView {
+                constructor(latlng, title, id) {
+                    super();
+                    this.latlng = latlng;
+                    this.title = title;
+                    this.id = id;
+                    this.div = null;
+                }
+                onAdd() {
+                    const div = document.createElement('div');
+                    div.className = 'pulse-marker';
+                    // Create the HTML structure for the glow effect
+                    div.innerHTML = `<div class="pulse-ring"></div><div class="pulse-core"></div>`;
+                    
+                    // === CLICK EVENT: REDIRECT TO ISSUE ===
+                    div.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent map click
+                        
+                        // 1. Find the card in the list
+                        const card = document.getElementById(`card-${this.id}`);
+                        
+                        if(card) { 
+                            // 2. Scroll to the card smoothly
+                            card.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
+                            
+                            // 3. Add highlighting effect
+                            card.classList.remove('highlight-card'); // Reset animation
+                            void card.offsetWidth; // Trigger reflow
+                            card.classList.add('highlight-card'); // Start animation
+                        } else {
+                            alert("Issue details are in the 'Active Incidents' tab.");
+                        }
+                    });
+
+                    div.title = this.title;
+                    this.div = div;
+                    const panes = this.getPanes();
+                    panes.overlayMouseTarget.appendChild(div);
+                }
+                draw() {
+                    const overlayProjection = this.getProjection();
+                    const pos = overlayProjection.fromLatLngToDivPixel(this.latlng);
+                    const div = this.div;
+                    if(div) {
+                        div.style.left = pos.x + 'px';
+                        div.style.top = pos.y + 'px';
+                    }
+                }
+                onRemove() {
+                    if (this.div) {
+                        this.div.parentNode.removeChild(this.div);
+                        this.div = null;
+                    }
+                }
+            }
+            PulseMarkerClass = PulseMarker;
+            syncData();
+        };
+
+        function syncData() {
+            const q = query(collection(db, "issues"), orderBy("timestamp", "desc"));
+            onSnapshot(q, (snapshot) => {
+                reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // 1. Update Counts
+                updateStats(); 
+                
+                // 2. Refresh Map Markers (Add/Remove based on status)
+                refreshMapPins();
+                
+                // 3. Render List (Important for redirection)
+                const activePage = document.querySelector('.page-section.active').id.split('-')[0];
+                if(activePage === 'stats') renderStatsList();
+                else if(activePage === 'feed') renderAdminFeed();
+                else if(activePage === 'pending' || activePage === 'resolved') renderList(activePage === 'pending' ? 'Pending' : 'Resolved');
+            });
+        }
+
+        // === MAP PIN LOGIC ===
+        let markers = [];
+        function refreshMapPins() {
+            if(!adminMap || !PulseMarkerClass) return;
+            
+            // Clear old markers
+            markers.forEach(m => m.setMap(null)); 
+            markers = [];
+
+            // FILTER: Only show markers for Unresolved issues
+            const pendingIssues = reports.filter(r => r.status !== 'Resolved' && r.locationLat && r.locationLng);
+            
+            pendingIssues.forEach(r => {
+                const latLng = new google.maps.LatLng(r.locationLat, r.locationLng);
+                const marker = new PulseMarkerClass(latLng, r.title, r.id);
+                marker.setMap(adminMap);
+                markers.push(marker);
+            });
+        }
+
+        function renderStatsList() {
+            const container = document.getElementById('stats-list-container');
+            const pending = reports.filter(r => r.status !== 'Resolved');
+            
+            // Note: assigned id="card-${r.id}" to allow scrolling
+            container.innerHTML = pending.map(r => `
+                <div id="card-${r.id}" class="bg-white p-4 rounded-2xl border shadow-sm flex gap-4 transition-all duration-300">
+                    <img src="${r.imageUrl}" class="w-20 h-20 rounded-xl object-cover bg-slate-100">
+                    <div class="flex-1">
+                        <div class="flex justify-between">
+                            <h4 class="font-bold text-sm text-slate-900">${r.title}</h4>
+                            <span class="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded-md font-bold uppercase tracking-wider">Pending</span>
+                        </div>
+                        <p class="text-xs text-slate-500 line-clamp-1 mt-1 mb-2">${r.description}</p>
+                        <button onclick="openResolveModal('${r.id}')" class="w-full py-2 bg-slate-900 text-white text-[10px] font-bold rounded-lg hover:bg-blue-600 transition-colors">Resolve Issue</button>
+                    </div>
+                </div>`
+            ).join('') || `<div class="col-span-2 text-center text-slate-400 p-4 border border-dashed rounded-2xl">No Pending Issues 🎉</div>`;
+        }
+
+        // --- Other Render Functions (Feed, Lists) ---
+        function renderAdminFeed() {
+            const container = document.getElementById('admin-feed-container');
+            if(!container) return;
+            container.innerHTML = "";
+
+            reports.forEach(r => {
+                if(r.isPrivate) return;
+                let resolutionHTML = r.status === "Resolved" && r.fixedImageUrl ? `<div class="mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100"><p class="text-xs font-bold text-emerald-600 mb-2"><i class="fas fa-check-circle"></i> Resolution Proof (After)</p><img src="${r.fixedImageUrl}" class="w-full h-48 object-cover rounded-lg"></div>` : "";
+                container.innerHTML += `
+                <div class="bg-white p-6 rounded-[2rem] border shadow-sm mb-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div><span class="bg-blue-100 text-blue-600 text-[10px] font-bold px-3 py-1 rounded-full uppercase">${r.category}</span><h3 class="text-lg font-bold mt-2">${r.title}</h3></div>
+                        <span class="text-[10px] font-bold text-slate-400">${r.dateDisplay || 'Just now'}</span>
+                    </div>
+                    <p class="text-sm text-slate-600 mb-3">${r.description}</p>
+                    <img src="${r.imageUrl}" class="w-full h-56 object-cover rounded-2xl mb-4 bg-slate-100 border">
+                    ${resolutionHTML}
+                    <div class="flex justify-between items-center pt-2 border-t mt-2">
+                        <span class="text-xs font-bold text-slate-500">By: ${r.studentName}</span>
+                        <button class="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200" onclick="toggleComments('${r.id}')"><i class="fas fa-comment-alt mr-1"></i> Admin Comment</button>
+                    </div>
+                    <div id="comments-${r.id}" class="comments-section bg-slate-50 rounded-2xl border border-slate-200 mt-4 p-4">
+                        <div id="list-${r.id}" class="space-y-4 mb-4 max-h-64 overflow-y-auto"></div>
+                        <div class="flex gap-2 items-center bg-white p-2 rounded-xl border focus-within:ring-2 ring-blue-500/20 transition">
+                            <input type="text" id="input-${r.id}" placeholder="Write official comment..." class="flex-1 px-3 py-1 text-sm outline-none bg-transparent">
+                            <button class="bg-slate-900 text-white p-2 rounded-lg text-xs font-bold hover:bg-slate-700 transition" onclick="postAdminComment('${r.id}')"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </div>`;
+            });
+        }
+
+        window.toggleComments = (id) => { const el = document.getElementById(`comments-${id}`); if(el.classList.contains('open')) el.classList.remove('open'); else { el.classList.add('open'); loadComments(id); } };
+        async function loadComments(id) {
+            const d = document.getElementById(`list-${id}`); d.innerHTML='Loading...';
+            const q = query(collection(db, "issues", id, "comments"), orderBy("timestamp", "asc"));
+            const s = await getDocs(q); d.innerHTML=""; if(s.empty) { d.innerHTML='No comments.'; return; }
+            s.forEach(c => { 
+                const dt = c.data();
+                const isOfficial = dt.isAdmin; 
+                const bubbleClass = isOfficial ? "bg-slate-800 text-white border-blue-500 border-l-4" : "bg-white text-slate-800 border-slate-100";
+                const nameClass = isOfficial ? "text-blue-400" : "text-slate-800";
+                const badge = isOfficial ? `<span class="bg-blue-600 text-[9px] text-white px-1.5 rounded ml-2">OFFICIAL</span>` : "";
+                d.innerHTML += `<div class="flex gap-3"><div class="flex-1"><div class="${bubbleClass} p-3 rounded-2xl shadow-sm inline-block w-full"><div class="flex items-center mb-1"><span class="text-xs font-bold ${nameClass}">${dt.authorName}</span>${badge}</div><p class="text-sm">${dt.text}</p></div></div></div>`; 
+            });
+        }
+        window.postAdminComment = async(id) => { const i = document.getElementById(`input-${id}`); if(!i.value.trim()) return; await addDoc(collection(db,"issues",id,"comments"), { text: i.value.trim(), authorId: currentUser.uid, authorName: "Chief Warden", isAdmin: true, timestamp: serverTimestamp() }); i.value=""; loadComments(id); };
+
+        window.renderList = function(type) {
+            const containerId = type === 'Pending' ? 'pending-list' : 'resolved-list';
+            const container = document.getElementById(containerId);
+            if(!container) return;
+            let filtered = reports.filter(r => type === 'Pending' ? r.status !== 'Resolved' : r.status === 'Resolved');
+            
+            container.innerHTML = filtered.map(r => {
+                let ratingHTML = "";
+                if(type === 'Resolved') {
+                    if(r.userRating) {
+                        let stars = "";
+                        for(let i=1; i<=5; i++) stars += i <= r.userRating ? '<i class="fas fa-star text-yellow-400"></i>' : '<i class="far fa-star text-slate-300"></i>';
+                        ratingHTML = `<div class="mt-3 pt-3 border-t border-slate-100"><span class="text-[10px] font-bold text-slate-400 uppercase">Student Rating:</span> <span class="text-xs ml-2">${stars}</span></div>`;
+                    } else {
+                        ratingHTML = `<div class="mt-3 pt-3 border-t border-slate-100"><span class="text-[10px] font-bold text-slate-400 uppercase italic">Waiting for Student Rating...</span></div>`;
+                    }
+                }
+
+                return `
+                <div class="bg-white p-6 rounded-[2.5rem] border shadow-sm flex flex-col md:flex-row gap-6">
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start mb-2"><span class="text-[9px] font-black uppercase tracking-tighter bg-slate-100 px-3 py-1 rounded-full">${r.category}</span><span class="text-[10px] font-bold ${r.status === 'Resolved' ? 'text-emerald-500' : 'text-amber-500'} uppercase">${r.status}</span></div>
+                        <h3 class="text-lg font-black text-slate-800">${r.title}</h3>
+                        <p class="text-xs text-slate-500 mt-1 mb-4">${r.description}</p>
+                        <div class="flex items-center gap-3 pt-4 border-t border-slate-50"><span class="text-[10px] font-bold text-slate-400 uppercase">By: ${r.studentName}</span><div class="flex-1"></div>${type === 'Pending' ? `<button onclick="openResolveModal('${r.id}')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition">Mark Done</button>` : `<span class="text-emerald-500 font-black text-[10px] uppercase flex items-center gap-1"><i class="fas fa-check-circle"></i> Verified</span>`}</div>
+                        ${ratingHTML}
+                    </div>
+                    <img src="${r.imageUrl}" class="w-32 h-32 object-cover rounded-3xl border bg-slate-50">
+                </div>`;
+            }).join('') || `<div class="p-10 text-center text-slate-400 font-bold uppercase text-xs">Queue Empty</div>`;
+        }
+
+        // === RESOLVE LOGIC ===
+        let activeResImage = null;
+        function compressImage(file) { return new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const maxWidth = 800; const scale = maxWidth/img.width; canvas.width = maxWidth; canvas.height = img.height*scale; canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height); resolve(canvas.toDataURL('image/jpeg', 0.7)); }; }; }); }
+        window.openResolveModal = (id) => { document.getElementById('target-issue-id').value = id; document.getElementById('res-modal').classList.remove('hidden'); };
+        window.closeModal = () => document.getElementById('res-modal').classList.add('hidden');
+        document.getElementById('res-upload-area').onclick = () => document.getElementById('res-image-input').click();
+        document.getElementById('res-image-input').onchange = async (e) => { if(e.target.files[0]) { activeResImage = await compressImage(e.target.files[0]); document.getElementById('res-preview').src = activeResImage; document.getElementById('res-preview').classList.remove('hidden'); } };
+        
+        document.getElementById('resolveForm').onsubmit = async (e) => { 
+            e.preventDefault(); 
+            const id = document.getElementById('target-issue-id').value; 
+            const btn = document.getElementById('btn-submit-fix'); 
+            
+            if(!activeResImage) return alert("Photo Proof Required!"); 
+            
+            btn.innerText = "Processing..."; 
+            btn.disabled = true; 
+            
+            try { 
+                await updateDoc(doc(db, "issues", id), { status: "Resolved", fixedImageUrl: activeResImage, resolvedAt: new Date() }); 
+                alert("Resolved!"); 
+                closeModal(); 
+                document.getElementById('res-preview').classList.add('hidden'); 
+                activeResImage = null; 
+            } catch (err) { alert(err.message); } 
+            finally { btn.innerText = "Submit Fix"; btn.disabled = false; } 
+        };
+
+        function updateStats() {
+            const p = reports.filter(r => r.status !== 'Resolved').length;
+            const r = reports.filter(r => r.status === 'Resolved').length;
+            document.getElementById('count-total').innerText = reports.length;
+            document.getElementById('count-pending').innerText = p;
+            document.getElementById('count-resolved').innerText = r;
+        }
+
+        window.toggleProfileMenu = function() { document.getElementById('profile-menu').classList.toggle('hidden'); };
+        window.onclick = function(e) { if (!e.target.closest('.relative')) { document.getElementById('profile-menu').classList.add('hidden'); } };
+
+        window.showPage = function(pageId) {
+            document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId + '-page').classList.add('active');
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.getElementById('nav-' + pageId).classList.add('active');
+            document.getElementById('header-title').innerText = pageId.charAt(0).toUpperCase() + pageId.slice(1) + " Overview";
+            
+            // Map Resize Fix when becoming visible
+            if(pageId === 'stats' && adminMap) {
+                renderStatsList(); // Re-render list
+                setTimeout(() => google.maps.event.trigger(adminMap, 'resize'), 300);
+            }
+            if(pageId === 'feed') renderAdminFeed();
+            else if(pageId === 'pending' || pageId === 'resolved') renderList(pageId === 'pending' ? 'Pending' : 'Resolved');
+        };
+
+        window.handleLogout = async function() { await signOut(auth); localStorage.removeItem('mnnit_current_user'); window.location.href = 'login.html'; };
+        const session = JSON.parse(localStorage.getItem('mnnit_current_user'));
+        
+        // Simple Auth Check
+        if (!session || session.role !== 'admin') {
+            // Uncomment in production:
+            // window.location.href = 'login.html';
+            console.log("Not logged in as admin (Dev Mode)");
+        } else { 
+            currentUser = session; document.getElementById('admin-name').innerText = session.email.split('@')[0]; 
+        }
+        setInterval(() => document.getElementById('live-time').innerText = new Date().toLocaleTimeString(), 1000);
+    </script>
+</body>
+</html>

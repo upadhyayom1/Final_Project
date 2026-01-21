@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Civic Connect | Vintage Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* IMPORT VINTAGE SANS-SERIF FONT */
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap');
+        
+        :root {
+            --paper-bg: #f4f1ea;
+            --card-bg: #fdfbf7;
+            --ink-dark: #2d2a26;
+            --ink-medium: #5c5855;
+            --accent-rust: #c0583d;
+            --accent-blue: #4a6fa5;
+            --accent-gold: #d4a373;
+            --border-color: #dcd7cd;
+        }
+
+        body { 
+            font-family: 'DM Sans', sans-serif; 
+            background-color: var(--paper-bg);
+            color: var(--ink-dark);
+            transition: background 0.3s, color 0.3s;
+            background-image: radial-gradient(#dcd7cd 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        /* NAVIGATION STYLES */
+        .nav-link { transition: all 0.2s ease; border: 1px solid transparent; }
+        .nav-link.active { 
+            background-color: var(--accent-rust) !important; 
+            color: #fff !important; 
+            border: 1px solid #a3432a;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
+            transform: translate(-1px, -1px);
+        }
+        .nav-link:hover { background-color: rgba(255,255,255,0.1); color: #fff; }
+        .nav-link.active:hover { background-color: var(--accent-rust); }
+
+        /* CARDS & CONTAINERS - PAPER STYLE */
+        .vintage-card {
+            background-color: var(--card-bg);
+            border: 2px solid var(--border-color);
+            box-shadow: 6px 6px 0px rgba(45, 42, 38, 0.05);
+        }
+        
+        .vintage-input {
+            background-color: #fff;
+            border: 2px solid var(--border-color);
+            color: var(--ink-dark);
+        }
+        .vintage-input:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.1);
+        }
+
+        /* BUTTONS */
+        .btn-primary {
+            background-color: var(--ink-dark);
+            color: #fdfbf7;
+            border: 2px solid var(--ink-dark);
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: var(--accent-rust);
+            border-color: var(--accent-rust);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(192, 88, 61, 0.3);
+        }
+
+        /* ANIMATION */
+        .page-section { display: none; }
+        .page-section.active { display: block; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* DARK MODE - NOIR STYLE */
+        body.dark-mode { 
+            --paper-bg: #1a1816; 
+            --card-bg: #262422; 
+            --ink-dark: #e6e2dd; 
+            --ink-medium: #a8a4a0;
+            --border-color: #3e3b38;
+            background-image: radial-gradient(#3e3b38 1px, transparent 1px);
+        }
+        body.dark-mode .bg-white { background-color: var(--card-bg); border-color: var(--border-color); color: var(--ink-dark); }
+        body.dark-mode .vintage-card { background-color: var(--card-bg); border-color: var(--border-color); box-shadow: 6px 6px 0px rgba(0,0,0,0.3); }
+        body.dark-mode input, body.dark-mode select, body.dark-mode textarea { background-color: #1a1816; border-color: var(--border-color); color: white; }
+        
+        /* UI HELPERS */
+        .comments-section { max-height: 0; overflow: hidden; transition: all 0.3s ease-out; opacity: 0; }
+        .comments-section.open { max-height: 500px; opacity: 1; margin-top: 15px; overflow-y: auto; }
+        .group:hover .avatar-overlay { opacity: 1; }
+        .toggle-checkbox:checked { right: 0; border-color: var(--accent-rust); }
+        .toggle-checkbox:checked + .toggle-label { background-color: var(--accent-rust); }
+        
+        #map { height: 100%; width: 100%; border-radius: 1rem; border: 2px solid var(--border-color); }
+        
+        /* NOTIFICATION DOT */
+        @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+        .animate-ping-slow { animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+        /* STAR RATING HOVER */
+        .star-rating button:hover, .star-rating button:hover ~ button { color: #dcd7cd !important; }
+        .star-rating:hover button { color: #e3b04b; }
+        .star-rating button:hover ~ button { color: #dcd7cd !important; }
+
+        /* AVATAR BADGE */
+        .avatar-container { position: relative; display: inline-block; }
+        .avatar-badge-mini {
+            position: absolute; bottom: -2px; right: -4px; width: 18px; height: 18px;
+            background: #fdfbf7; border-radius: 50%; border: 2px solid var(--border-color);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10;
+        }
+
+        /* BADGE GRID STYLES */
+        .badge-item { transition: all 0.3s ease; }
+        .badge-item.locked { filter: grayscale(1); opacity: 0.5; }
+        .badge-item:hover:not(.locked) { transform: translateY(-5px); }
+        
+        /* TOOLTIP FOR PROGRESS */
+        .progress-tooltip {
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ink-dark);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 50;
+        }
+        .progress-container:hover .progress-tooltip { opacity: 1; }
+
+        .gm-err-container { display: none !important; } .gm-style-pbc { opacity: 0 !important; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <aside class="w-72 bg-[#2d2a26] text-[#e6e2dd] flex flex-col hidden md:flex border-r border-[#3e3b38]">
+        <div class="p-8 text-2xl font-bold flex items-center gap-3 border-b border-[#3e3b38]">
+            <div class="bg-[#c0583d] p-2 rounded-lg border-2 border-[#a3432a] text-white"><i class="fas fa-landmark text-sm"></i></div>
+            <span class="tracking-tight uppercase text-lg">MNNIT<span class="font-normal text-[#a8a4a0]">Connect</span></span>
+        </div>
+        <div class="px-6 pt-6">
+            <div class="bg-[#3a3632] rounded-xl p-4 border border-[#4a4642] shadow-lg relative progress-container cursor-help">
+                <div class="progress-tooltip" id="progress-tooltip-text">Loading stats...</div>
+                <p class="text-[10px] font-bold text-[#a8a4a0] uppercase tracking-widest mb-1">Civic Standing</p>
+                <div class="flex justify-between items-end">
+                    <span class="text-3xl font-bold text-[#d4a373]" id="sidebar-points">0</span>
+                    <span class="text-xs font-bold text-[#2d2a26] bg-[#d4a373] px-2 py-1 rounded border border-[#b8865e]" id="sidebar-level">Rookie</span>
+                </div>
+                <div class="w-full bg-[#2d2a26] h-2 mt-3 rounded-full overflow-hidden border border-[#4a4642]">
+                    <div class="bg-[#c0583d] h-full w-0 transition-all duration-1000" id="sidebar-progress"></div>
+                </div>
+            </div>
+        </div>
+        <nav class="flex-1 p-6 space-y-3">
+            <button onclick="showPage('dashboard')" id="nav-dashboard" class="nav-link active flex items-center gap-4 p-4 w-full rounded-xl font-medium text-[#a8a4a0]">
+                <i class="fas fa-grid-2 w-5"></i> Dashboard
+            </button>
+            <button onclick="showPage('feed')" id="nav-feed" class="nav-link flex items-center gap-4 p-4 w-full rounded-xl font-medium text-[#a8a4a0]">
+                <i class="fas fa-newspaper w-5"></i> Campus Feed
+            </button>
+            <button onclick="showPage('reposts')" id="nav-reposts" class="nav-link flex items-center gap-4 p-4 w-full rounded-xl font-medium text-[#a8a4a0]">
+                <i class="fas fa-retweet w-5"></i> My Reposts
+            </button>
+            <button onclick="showPage('history')" id="nav-history" class="nav-link flex items-center gap-4 p-4 w-full rounded-xl font-medium text-[#a8a4a0]">
+                <i class="fas fa-history w-5"></i> My History
+            </button>
+            <button onclick="showPage('profile')" id="nav-profile" class="nav-link flex items-center gap-4 p-4 w-full rounded-xl font-medium text-[#a8a4a0]">
+                <i class="fas fa-user-circle w-5"></i> My Profile
+            </button>
+        </nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto">
+        <header class="bg-[#f4f1ea]/90 backdrop-blur-md border-b border-[#dcd7cd] px-10 py-5 flex justify-between items-center sticky top-0 z-50">
+            <div>
+                <h1 class="text-2xl font-bold text-[#2d2a26] tracking-tight" id="header-title">Student Dashboard</h1>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <div class="relative">
+                    <button id="notif-btn" onclick="toggleNotifications()" class="p-3 hover:bg-[#e8e4da] rounded-xl transition-all relative group border border-transparent hover:border-[#dcd7cd]">
+                        <i class="fas fa-bell text-[#5c5855] text-xl"></i>
+                        <span id="notif-dot" class="absolute top-2 right-2 flex h-3 w-3 hidden">
+                          <span class="animate-ping-slow absolute inline-flex h-full w-full rounded-full bg-[#c0583d] opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-3 w-3 bg-[#c0583d] border-2 border-[#f4f1ea]"></span>
+                        </span>
+                    </button>
+                    <div id="notif-menu" class="hidden absolute right-0 mt-3 w-80 bg-[#fdfbf7] rounded-xl shadow-xl border-2 border-[#dcd7cd] py-2 z-50 max-h-96 overflow-y-auto">
+                        <div class="px-5 py-3 border-b border-[#dcd7cd] bg-[#f4f1ea]"><span class="text-xs font-bold text-[#5c5855] uppercase tracking-wider">Recent Updates</span></div>
+                        <div id="notif-list" class="p-2 space-y-1"><p class="text-center text-xs text-[#a8a4a0] py-4">No new notifications</p></div>
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <button id="profile-btn" onclick="toggleProfileMenu()" class="flex items-center gap-4 hover:bg-[#e8e4da] p-2 rounded-xl border border-transparent hover:border-[#dcd7cd] transition-all">
+                        <div class="text-right hidden sm:block"><p class="text-sm font-bold display-name text-[#2d2a26]">Student</p></div>
+                        <div class="avatar-container">
+                            <img id="header-avatar" src="" class="w-10 h-10 rounded-lg shadow-sm border border-[#dcd7cd] display-avatar object-cover">
+                            <div class="avatar-badge-mini" id="header-badge">🐣</div>
+                        </div>
+                    </button>
+                    <div id="profile-menu" class="hidden absolute right-0 mt-3 w-64 bg-[#fdfbf7] rounded-xl shadow-xl border-2 border-[#dcd7cd] py-3 z-50">
+                        <button onclick="showPage('profile')" class="w-full flex items-center gap-3 px-6 py-3 text-sm font-bold text-[#5c5855] hover:bg-[#e8e4da] rounded-lg mx-2 w-[calc(100%-16px)]"><i class="fas fa-user-circle"></i> Edit Profile</button>
+                        <button onclick="toggleSettingsModal()" class="w-full flex items-center gap-3 px-6 py-3 text-sm font-bold text-[#5c5855] hover:bg-[#e8e4da] rounded-lg mx-2 w-[calc(100%-16px)]"><i class="fas fa-cog"></i> Settings</button>
+                        <hr class="my-2 border-[#dcd7cd]">
+                        <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-6 py-3 text-sm font-bold text-[#c0583d] hover:bg-[#fff0ed] rounded-lg mx-2 w-[calc(100%-16px)]"><i class="fas fa-sign-out-alt"></i> Sign Out</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-8 max-w-7xl mx-auto">
+            
+            <section id="dashboard-page" class="page-section active">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="vintage-card p-8 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold mb-6 text-[#2d2a26] border-b-2 border-[#dcd7cd] pb-2 inline-block">Quick Report</h2>
+                            <form id="complaintForm" class="space-y-4">
+                                <input type="text" id="comp-title" required placeholder="Issue Title (e.g. Broken Fan)" class="vintage-input w-full px-5 py-4 rounded-xl outline-none">
+                                <select id="comp-category" class="vintage-input w-full px-5 py-4 rounded-xl outline-none">
+                                    <option>Hostel</option><option>Academic</option><option>Infrastructure</option><option>Cleanliness</option>
+                                </select>
+                                <textarea id="comp-desc" required placeholder="Description & Location" class="vintage-input w-full px-5 py-4 rounded-xl outline-none h-32"></textarea>
+                                <div class="flex items-center justify-between bg-[#f4f1ea] p-4 rounded-xl border border-[#dcd7cd]">
+                                    <div><span class="text-xs font-bold text-[#5c5855] block"><i class="fas fa-lock text-[#a8a4a0] mr-1"></i> Private Report?</span><span class="text-[9px] text-[#a8a4a0]">Only visible to Admin & You</span></div>
+                                    <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="comp-private" class="sr-only peer"><div class="w-11 h-6 bg-[#dcd7cd] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2d2a26]"></div></label>
+                                </div>
+                                <div id="image-upload-area" class="w-full py-6 border-2 border-dashed border-[#dcd7cd] rounded-xl text-center cursor-pointer hover:bg-[#f4f1ea] transition bg-white">
+                                    <i class="fas fa-camera-retro text-[#a8a4a0] text-3xl mb-2"></i><p class="text-[10px] font-bold text-[#5c5855] uppercase">ATTACH PHOTO</p><input type="file" id="comp-image" accept="image/*" class="hidden"><img id="image-preview" class="hidden mt-4 max-h-24 mx-auto rounded-lg object-cover border border-[#dcd7cd]">
+                                </div>
+                                <button type="submit" id="btn-submit-report" class="btn-primary w-full font-bold py-4 rounded-xl shadow-lg mt-4 uppercase tracking-wider text-sm">Submit Report</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="vintage-card p-3 rounded-2xl h-[700px] relative overflow-hidden">
+                        <div class="absolute top-6 left-8 z-10 bg-[#fdfbf7]/90 backdrop-blur px-4 py-2 rounded-lg shadow-md border border-[#dcd7cd]"><h2 class="text-xs font-bold text-[#2d2a26]">📍 Drag marker to location</h2></div>
+                        <div id="map" class="w-full h-full bg-[#e8e4da]"></div>
+                    </div>
+                </div>
+                <div class="vintage-card p-8 rounded-2xl mt-8"><h2 class="text-2xl font-bold mb-8 text-[#2d2a26] border-b-2 border-[#dcd7cd] pb-2 inline-block">Campus Statistics</h2><div class="h-64"><canvas id="resolvedIssuesChart"></canvas></div></div>
+            </section>
+
+            <section id="profile-page" class="page-section">
+                <div class="vintage-card p-10 rounded-[2rem] max-w-4xl mx-auto">
+                    <div class="bg-[#2d2a26] text-[#e6e2dd] p-8 rounded-2xl mb-10 relative overflow-hidden border border-[#3e3b38]">
+                        <div class="relative z-10 flex flex-col md:flex-row gap-8 items-center">
+                            <div class="relative group cursor-pointer w-32 h-32" onclick="document.getElementById('profile-pic-input').click()">
+                                <img id="profile-avatar-big" src="" class="w-full h-full rounded-full border-4 border-[#c0583d] object-cover shadow-xl bg-[#f4f1ea]">
+                                <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center avatar-overlay opacity-0 transition-opacity"><i class="fas fa-camera text-2xl"></i></div>
+                                <div id="avatar-badge" class="absolute -bottom-1 -right-1 bg-[#fdfbf7] p-2 rounded-full border-4 border-[#2d2a26] shadow-xl z-50 flex items-center justify-center w-12 h-12 text-2xl">🐣</div>
+                                <input type="file" id="profile-pic-input" accept="image/*" class="hidden">
+                            </div>
+                            <div class="text-center md:text-left flex-1">
+                                <h2 class="text-3xl font-bold display-name text-[#f4f1ea]">Student Name</h2>
+                                <p class="text-[#4a6fa5] font-bold tracking-widest text-xs uppercase mb-4" id="prof-reg-display">Reg: Loading...</p>
+                                <div class="flex gap-4 justify-center md:justify-start">
+                                    <div class="bg-white/5 px-4 py-2 rounded-lg border border-white/10"><span class="block text-2xl font-bold text-[#d4a373]" id="prof-karma">0</span><span class="text-[10px] uppercase font-bold text-[#a8a4a0]">Karma</span></div>
+                                    <div class="bg-white/5 px-4 py-2 rounded-lg border border-white/10"><span class="block text-2xl font-bold text-[#4a6fa5]" id="prof-reports">0</span><span class="text-[10px] uppercase font-bold text-[#a8a4a0]">Reports</span></div>
+                                    <div class="bg-white/5 px-4 py-2 rounded-lg border border-white/10"><span class="block text-2xl font-bold text-[#8fa87a]" id="prof-badges-count">0</span><span class="text-[10px] uppercase font-bold text-[#a8a4a0]">Badges</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <form id="profile-edit-form">
+                        <div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-[#2d2a26]">Personal Details</h3><button type="submit" id="btn-save-profile" class="bg-[#4a6fa5] hover:bg-[#3a5d8f] text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md transition border-2 border-[#3a5d8f]">Save Changes</button></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2"><label class="text-[10px] font-bold text-[#a8a4a0] uppercase">Full Name (Locked)</label><input type="text" id="edit-name" disabled class="vintage-input bg-[#f4f1ea] w-full px-5 py-3 rounded-xl font-bold text-[#5c5855] cursor-not-allowed"></div>
+                            <div class="space-y-2"><label class="text-[10px] font-bold text-[#a8a4a0] uppercase">Registration ID (Locked)</label><input type="text" id="edit-reg" disabled class="vintage-input bg-[#f4f1ea] w-full px-5 py-3 rounded-xl font-bold text-[#5c5855] cursor-not-allowed"></div>
+                            <div class="space-y-2"><label class="text-[10px] font-bold text-[#5c5855] uppercase">Branch</label><select id="edit-branch" class="vintage-input w-full px-5 py-3 rounded-xl"><option value="">Select Branch</option><option value="CSE">CSE</option><option value="ECE">ECE</option><option value="EE">EE</option><option value="ME">ME</option><option value="CE">Civil</option></select></div>
+                            <div class="space-y-2"><label class="text-[10px] font-bold text-[#5c5855] uppercase">Year</label><select id="edit-year" class="vintage-input w-full px-5 py-3 rounded-xl"><option value="">Select Year</option><option value="1st Year">1st Year</option><option value="2nd Year">2nd Year</option><option value="3rd Year">3rd Year</option><option value="Final Year">Final Year</option></select></div>
+                            <div class="space-y-2"><label class="text-[10px] font-bold text-[#5c5855] uppercase">Gender</label><select id="edit-gender" class="vintage-input w-full px-5 py-3 rounded-xl"><option value="">Select Gender</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+                            <div class="space-y-2"><label class="text-[10px] font-bold text-[#5c5855] uppercase">Mobile</label><input type="tel" id="edit-mobile" class="vintage-input w-full px-5 py-3 rounded-xl"></div>
+                        </div>
+                    </form>
+                    <h3 class="text-xl font-bold mt-10 mb-4 text-[#2d2a26]">Badges Collection</h3>
+                    <div id="badges-container" class="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-[#f4f1ea] rounded-xl border-2 border-dashed border-[#dcd7cd]">
+                        </div>
+                </div>
+            </section>
+
+            <section id="feed-page" class="page-section"><div id="feed-container" class="space-y-6"></div></section>
+            
+            <section id="reposts-page" class="page-section">
+                <h2 class="text-2xl font-bold mb-6 text-[#2d2a26]">My Reposted Issues</h2>
+                <div id="reposts-container" class="space-y-6"></div>
+            </section>
+
+            <section id="history-page" class="page-section"><div id="history-container" class="space-y-4"></div></section>
+        </div>
+    </main>
+
+    <div id="settings-modal" class="fixed inset-0 bg-[#2d2a26]/70 z-[100] hidden flex justify-center items-center backdrop-blur-sm">
+        <div class="vintage-card p-8 rounded-2xl shadow-2xl w-96 relative">
+            <button onclick="toggleSettingsModal()" class="absolute top-4 right-4 text-[#a8a4a0] hover:text-[#5c5855]"><i class="fas fa-times text-xl"></i></button>
+            <h2 class="text-2xl font-bold mb-6 text-[#2d2a26]">Settings</h2>
+            <div class="space-y-6">
+                <div class="flex items-center justify-between p-4 bg-[#f4f1ea] rounded-xl border border-[#dcd7cd]">
+                    <div class="flex items-center gap-3"><div class="bg-[#e8e4da] p-2 rounded-lg text-[#5c5855]"><i class="fas fa-moon"></i></div><span class="font-bold text-sm text-[#2d2a26]">Noir Mode</span></div>
+                    <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="dark-mode-toggle" class="sr-only peer" onchange="toggleDarkMode()"><div class="w-11 h-6 bg-[#dcd7cd] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2d2a26]"></div></label>
+                </div>
+                <p class="text-xs text-center text-[#a8a4a0] mt-4 font-serif italic">Est. 2024 • Civic Connect</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA45q-hu_MJph1n_0uuJd42G8QRT7bg8RI&callback=initMap" async defer></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, serverTimestamp, updateDoc, arrayUnion, arrayRemove, orderBy, increment } 
+            from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_HB6QXbdv5z6zKXIkU18nw7k9NFOmZ5s",
+            authDomain: "mnnit-devjam.firebaseapp.com",
+            projectId: "mnnit-devjam",
+            storageBucket: "mnnit-devjam.firebasestorage.app",
+            messagingSenderId: "860519154056",
+            appId: "1:860519154056:web:1f848fba6723b04419fa3d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let userProfile = null;
+        let currentUploadedImage = null;
+        let newProfilePic = null;
+        let map, marker, currentLat = 25.4913, currentLng = 81.8667;
+        let issuesChart = null;
+
+        window.toggleDarkMode = function() {
+            const isDark = document.getElementById('dark-mode-toggle').checked;
+            if(isDark) document.body.classList.add('dark-mode');
+            else document.body.classList.remove('dark-mode');
+            localStorage.setItem('mnnit_theme', isDark ? 'dark' : 'light');
+        }
+
+        window.initMap = function() {
+            const mnnitCenter = { lat: 25.4913, lng: 81.8667 };
+            const MNNIT_BOUNDS = { north: 25.5050, south: 25.4800, west: 81.8550, east: 81.8800 };
+            try {
+                // VINTAGE MAP STYLE
+                const vintageMapStyle = [
+                    { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
+                    { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+                    { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+                    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
+                    { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
+                    { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
+                    { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+                    { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
+                    { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+                    { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#dadada" }] },
+                    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] }
+                ];
+
+                map = new google.maps.Map(document.getElementById("map"), {
+                    zoom: 16, center: mnnitCenter, streetViewControl: false, mapTypeControl: false,
+                    restriction: { latLngBounds: MNNIT_BOUNDS, strictBounds: false }, minZoom: 15, maxZoom: 20,
+                    styles: vintageMapStyle
+                });
+                marker = new google.maps.Marker({ position: mnnitCenter, map: map, draggable: true, title: "Drag me!" });
+                marker.addListener("dragend", (e) => { currentLat = e.latLng.lat(); currentLng = e.latLng.lng(); });
+                map.addListener("click", (e) => { marker.setPosition(e.latLng); currentLat = e.latLng.lat(); currentLng = e.latLng.lng(); });
+            } catch(e) { console.error("Map Error:", e); }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const theme = localStorage.getItem('mnnit_theme');
+            if(theme === 'dark') { document.body.classList.add('dark-mode'); document.getElementById('dark-mode-toggle').checked = true; }
+
+            const session = localStorage.getItem('mnnit_current_user');
+            if (!session) { window.location.href = 'login.html'; return; }
+            currentUser = JSON.parse(session);
+
+            try {
+                const docSnap = await getDoc(doc(db, "users", currentUser.uid));
+                if (docSnap.exists()) { 
+                    userProfile = docSnap.data(); 
+                    updateUI(userProfile);
+                    checkNotifications();
+                }
+            } catch (err) { console.error(err); }
+            fetchChartData();
+        });
+
+        window.toggleNotifications = function() {
+            const menu = document.getElementById('notif-menu');
+            const dot = document.getElementById('notif-dot');
+            menu.classList.toggle('hidden');
+            if (!menu.classList.contains('hidden')) {
+                dot.classList.add('hidden');
+                localStorage.setItem('mnnit_last_resolved_count', document.getElementById('notif-list').querySelectorAll('div').length);
+            }
+        }
+
+        async function checkNotifications() {
+            const list = document.getElementById('notif-list');
+            const dot = document.getElementById('notif-dot');
+            const q = query(collection(db, "issues"), where("studentId", "==", currentUser.uid), where("status", "==", "Resolved"));
+            const snapshot = await getDocs(q);
+            if (snapshot.empty) { list.innerHTML = `<p class="text-center text-xs text-[#a8a4a0] py-4">No resolved issues.</p>`; return; }
+            list.innerHTML = ""; let count = 0;
+            snapshot.forEach(doc => {
+                const r = doc.data(); count++;
+                list.innerHTML += `<div class="px-4 py-3 hover:bg-[#e8e4da] transition border-b border-[#dcd7cd] cursor-pointer" onclick="showPage('history')"><div class="flex items-start gap-3"><div class="bg-green-100 p-1.5 rounded-full text-green-700 border border-green-200"><i class="fas fa-check text-xs"></i></div><div><p class="text-xs font-bold text-[#2d2a26]">Issue Resolved!</p><p class="text-[10px] text-[#5c5855] line-clamp-1">"${r.title}" fixed.</p></div></div></div>`;
+            });
+            const lastSeen = parseInt(localStorage.getItem('mnnit_last_resolved_count') || "0");
+            if (count > lastSeen) dot.classList.remove('hidden');
+        }
+
+        function updateUI(profile) {
+            const name = profile.fullName || "Student";
+            const reg = profile.registrationId || "Unknown";
+            const points = profile.points || 0;
+            const reportCount = profile.reportCount || 0;
+            
+            document.querySelectorAll('.display-name').forEach(el => el.innerText = name);
+            const avatarUrl = profile.profilePic || `https://ui-avatars.com/api/?name=${name}&background=2d2a26&color=f4f1ea&bold=true`;
+            document.querySelectorAll('.display-avatar').forEach(img => img.src = avatarUrl);
+            document.getElementById('header-avatar').src = avatarUrl;
+            document.getElementById('profile-avatar-big').src = avatarUrl;
+            
+            document.getElementById('sidebar-points').innerText = points;
+            document.getElementById('prof-karma').innerText = points;
+            document.getElementById('prof-reports').innerText = reportCount;
+            document.getElementById('prof-reg-display').innerText = "Reg: " + reg;
+
+            document.getElementById('edit-name').value = name;
+            document.getElementById('edit-reg').value = reg;
+            document.getElementById('edit-branch').value = profile.branch || "";
+            document.getElementById('edit-year').value = profile.year || "";
+            document.getElementById('edit-gender').value = profile.gender || "";
+            document.getElementById('edit-mobile').value = profile.mobile || "";
+            
+            // --- LEVEL & PROGRESS LOGIC ---
+            let level="Rookie", badgeIcon="🐣", progress="10%", nextThreshold=50;
+            if(points>=50) { level="Scout"; badgeIcon="🦅"; progress="33%"; nextThreshold=150; }
+            if(points>=150) { level="Guardian"; badgeIcon="🛡️"; progress="66%"; nextThreshold=500; }
+            if(points>=500) { level="Legend"; badgeIcon="👑"; progress="100%"; nextThreshold=1000; }
+            
+            // Calculate remaining points
+            let needed = nextThreshold - points;
+            let tooltipText = `${points} / ${nextThreshold} Points (${needed} to ${points >= 500 ? 'Max Rank' : 'Next Level'})`;
+            if(points >= 500) tooltipText = "Max Rank Achieved! (Legend Status)";
+
+            document.getElementById('sidebar-level').innerText = level;
+            document.getElementById('sidebar-progress').style.width = progress;
+            document.getElementById('avatar-badge').innerText = badgeIcon;
+            document.getElementById('header-badge').innerText = badgeIcon;
+            document.getElementById('progress-tooltip-text').innerText = tooltipText;
+
+            // --- BADGES COLLECTION LOGIC ---
+            const badgeList = [
+                { name: "New Contributor", icon: "fas fa-paper-plane", text: "Joined the portal", unlocked: true }, // Always true
+                { name: "First Report", icon: "fas fa-camera", text: "Posted 1st issue", unlocked: reportCount > 0 },
+                { name: "Civic Scout", icon: "fas fa-binoculars", text: "Earned 50 Karma", unlocked: points >= 50 },
+                { name: "Guardian", icon: "fas fa-shield-alt", text: "Earned 150 Karma", unlocked: points >= 150 },
+                { name: "Campus Legend", icon: "fas fa-crown", text: "Earned 500 Karma", unlocked: points >= 500 },
+                { name: "Activist", icon: "fas fa-bullhorn", text: "Posted 5+ Reports", unlocked: reportCount >= 5 }
+            ];
+
+            const badgesContainer = document.getElementById('badges-container');
+            badgesContainer.innerHTML = "";
+            let earnedCount = 0;
+
+            badgeList.forEach(b => {
+                if(b.unlocked) earnedCount++;
+                const colorClass = b.unlocked ? "bg-[#fdfbf7] border-[#d4a373] text-[#c0583d]" : "bg-[#e8e4da] border-[#dcd7cd] text-[#a8a4a0] locked";
+                const iconColor = b.unlocked ? "text-[#c0583d]" : "text-[#a8a4a0]";
+                
+                badgesContainer.innerHTML += `
+                <div class="badge-item ${colorClass} p-4 rounded-xl border-2 flex flex-col items-center text-center shadow-sm">
+                    <div class="bg-[#f4f1ea] w-12 h-12 rounded-full flex items-center justify-center mb-2 border border-[#dcd7cd]">
+                        <i class="${b.icon} ${iconColor} text-xl"></i>
+                    </div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider mb-1">${b.name}</h4>
+                    <p class="text-[9px] opacity-70 leading-tight">${b.text}</p>
+                </div>`;
+            });
+            document.getElementById('prof-badges-count').innerText = earnedCount;
+        }
+
+        function getBadgeIcon(p) {
+            if(p>=500) return '👑'; if(p>=150) return '🛡️'; if(p>=50) return '🦅'; return '🐣';
+        }
+
+        function compressImage(file) { return new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const maxWidth = 800; const scale = maxWidth/img.width; canvas.width = maxWidth; canvas.height = img.height*scale; canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height); resolve(canvas.toDataURL('image/jpeg', 0.7)); }; }; }); }
+        document.getElementById('profile-pic-input').onchange = async (e) => { if(e.target.files[0]) { newProfilePic = await compressImage(e.target.files[0]); document.getElementById('profile-avatar-big').src = newProfilePic; } };
+        document.getElementById('profile-edit-form').onsubmit = async (e) => { e.preventDefault(); const btn = document.getElementById('btn-save-profile'); btn.innerText = "Saving..."; btn.disabled = true; const updates = { branch: document.getElementById('edit-branch').value, year: document.getElementById('edit-year').value, gender: document.getElementById('edit-gender').value, mobile: document.getElementById('edit-mobile').value }; if (newProfilePic) updates.profilePic = newProfilePic; try { await updateDoc(doc(db, "users", currentUser.uid), updates); userProfile = (await getDoc(doc(db, "users", currentUser.uid))).data(); updateUI(userProfile); alert("Updated!"); } catch(e){ alert(e.message); } finally { btn.innerText = "Save Changes"; btn.disabled = false; } };
+
+        document.getElementById('image-upload-area').onclick = () => document.getElementById('comp-image').click();
+        document.getElementById('comp-image').onchange = async (e) => { currentUploadedImage = await compressImage(e.target.files[0]); document.getElementById('image-preview').src = currentUploadedImage; document.getElementById('image-preview').classList.remove('hidden'); };
+        
+        document.getElementById('complaintForm').onsubmit = async (e) => { 
+            e.preventDefault(); if(!currentUploadedImage) return alert("Photo required!"); 
+            const btn = document.getElementById('btn-submit-report'); const isPrivate = document.getElementById('comp-private').checked;
+            btn.innerText = "Posting..."; btn.disabled = true; 
+            try { 
+                const freshUser = (await getDoc(doc(db, "users", currentUser.uid))).data();
+                await addDoc(collection(db, "issues"), { 
+                    studentId: currentUser.uid, studentName: freshUser.fullName||"Student", 
+                    authorPic: freshUser.profilePic || null, authorBadge: getBadgeIcon(freshUser.points || 0), 
+                    title: document.getElementById('comp-title').value, category: document.getElementById('comp-category').value, description: document.getElementById('comp-desc').value, imageUrl: currentUploadedImage, locationLat: currentLat, locationLng: currentLng, status: "Pending", isPrivate: isPrivate, 
+                    repostedBy: [], 
+                    upvotedBy: [], downvotedBy: [], timestamp: serverTimestamp(), dateDisplay: new Date().toLocaleDateString() 
+                }); 
+                await updateDoc(doc(db, "users", currentUser.uid), { points: increment(10), reportCount: increment(1) }); 
+                alert("Posted! +10 Karma"); document.getElementById('complaintForm').reset(); document.getElementById('image-preview').classList.add('hidden'); currentUploadedImage = null; 
+                userProfile = (await getDoc(doc(db, "users", currentUser.uid))).data(); updateUI(userProfile); showPage('feed'); fetchChartData(); 
+            } catch(e){ alert(e.message); } finally { btn.innerText = "Submit Report"; btn.disabled = false; } 
+        };
+
+        window.handleRepost = async function(docId) {
+            const ref = doc(db, "issues", docId);
+            const d = (await getDoc(ref)).data();
+            const u = currentUser.uid;
+            let update = d.repostedBy?.includes(u) ? { repostedBy: arrayRemove(u) } : { repostedBy: arrayUnion(u) };
+            await updateDoc(ref, update);
+            renderFeed();
+        }
+
+        async function renderFeed() {
+            const container = document.getElementById('feed-container'); container.innerHTML = '<p class="text-center text-[#a8a4a0]">Loading feed...</p>';
+            try { 
+                const q = query(collection(db, "issues"), orderBy("timestamp", "desc")); const s = await getDocs(q); container.innerHTML = "";
+                s.forEach(docSnap => { 
+                    const r = docSnap.data(); if(r.isPrivate) return; 
+                    const docId = docSnap.id; 
+                    const score = (r.upvotedBy?.length || 0) - (r.downvotedBy?.length || 0); 
+                    const isUp = r.upvotedBy?.includes(currentUser.uid), isDown = r.downvotedBy?.includes(currentUser.uid);
+                    
+                    const repostCount = r.repostedBy ? r.repostedBy.length : 0;
+                    const isReposted = r.repostedBy?.includes(currentUser.uid);
+
+                    let displayPic = r.authorPic; let displayBadge = r.authorBadge;
+                    if (r.studentId === currentUser.uid) { displayPic = userProfile.profilePic; displayBadge = getBadgeIcon(userProfile.points || 0); }
+                    const finalAvatar = displayPic || `https://ui-avatars.com/api/?name=${r.studentName}&background=a8a4a0&color=2d2a26&bold=true`;
+                    const finalBadge = displayBadge || '🐣';
+
+                    let resolutionHTML = r.status === "Resolved" && r.fixedImageUrl ? `<div class="mt-4 p-3 bg-green-50 rounded-xl border border-green-200"><p class="text-xs font-bold text-green-700 mb-2"><i class="fas fa-check-circle"></i> Resolution Proof (After)</p><img src="${r.fixedImageUrl}" class="w-full h-48 object-cover rounded-lg"></div>` : "";
+                    
+                    container.innerHTML += `
+                    <div class="vintage-card p-6 rounded-2xl mb-6">
+                        <div class="flex justify-between items-start mb-4"><div><span class="bg-[#4a6fa5] text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">${r.category}</span><h3 class="text-lg font-bold mt-2 text-[#2d2a26]">${r.title}</h3></div><span class="text-[10px] font-bold text-[#a8a4a0]">${r.dateDisplay}</span></div>
+                        <p class="text-sm text-[#5c5855] mb-3 leading-relaxed font-medium">${r.description}</p>
+                        <div class="relative"><img src="${r.imageUrl}" class="w-full h-56 object-cover rounded-lg mb-4 bg-[#f4f1ea] border border-[#dcd7cd]"></div> ${resolutionHTML}
+                        
+                        <div class="flex justify-between items-center pt-2 border-t border-[#dcd7cd] mt-2">
+                            <div class="flex items-center gap-2">
+                                <div class="avatar-container"><img src="${finalAvatar}" class="w-8 h-8 rounded-full object-cover border border-[#dcd7cd]"><div class="avatar-badge-mini">${finalBadge}</div></div>
+                                <span class="text-xs font-bold text-[#5c5855]">${r.studentName}</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center bg-[#f4f1ea] rounded-lg border border-[#dcd7cd]">
+                                    <button class="px-3 py-2 ${isUp?'text-[#4a6fa5]':'text-[#a8a4a0]'}" onclick="handleVote('${docId}','up')"><i class="fas fa-arrow-up"></i></button>
+                                    <span class="text-xs font-bold w-4 text-center text-[#2d2a26]">${score}</span>
+                                    <button class="px-3 py-2 ${isDown?'text-[#c0583d]':'text-[#a8a4a0]'}" onclick="handleVote('${docId}','down')"><i class="fas fa-arrow-down"></i></button>
+                                    <div class="w-px h-4 bg-[#dcd7cd] mx-1"></div>
+                                    <button class="px-3 py-2 ${isReposted?'text-green-600':'text-[#a8a4a0]'} flex items-center gap-1" onclick="handleRepost('${docId}')">
+                                        <i class="fas fa-retweet"></i> <span class="text-xs">${repostCount}</span>
+                                    </button>
+                                </div>
+                                <button class="px-4 py-2 bg-[#f4f1ea] rounded-lg text-xs font-bold text-[#5c5855] border border-[#dcd7cd] hover:bg-[#e8e4da] transition" onclick="toggleComments('${docId}')">Discuss</button>
+                            </div>
+                        </div>
+                        <div id="comments-${docId}" class="comments-section bg-[#f4f1ea] rounded-xl border border-[#dcd7cd] mt-4 p-4"><div id="list-${docId}" class="space-y-4 mb-4 max-h-64 overflow-y-auto"></div><div class="flex gap-2 items-center bg-white p-2 rounded-lg border border-[#dcd7cd] focus-within:ring-2 ring-[#4a6fa5]/20 transition"><input type="text" id="input-${docId}" placeholder="Comment..." class="flex-1 px-3 py-1 text-sm outline-none bg-transparent text-[#2d2a26]"><button class="bg-[#4a6fa5] text-white p-2 rounded-lg text-xs font-bold hover:bg-[#3a5d8f] transition" onclick="postComment('${docId}')"><i class="fas fa-paper-plane"></i></button></div></div></div>`; }); 
+            } catch(e){console.error(e);}
+        }
+
+        async function loadMyReposts() {
+            const container = document.getElementById('reposts-container');
+            container.innerHTML = '<p class="text-center text-[#a8a4a0]">Loading reposts...</p>';
+            try {
+                const q = query(collection(db, "issues"), where("repostedBy", "array-contains", currentUser.uid));
+                const s = await getDocs(q);
+                if(s.empty) { container.innerHTML = `<p class="text-center text-[#a8a4a0] text-sm">You haven't reposted anything yet.</p>`; return; }
+                container.innerHTML = "";
+                s.forEach(docSnap => {
+                    const r = docSnap.data();
+                    container.innerHTML += `
+                    <div class="vintage-card p-6 rounded-2xl flex flex-col md:flex-row gap-6 mb-4">
+                        <img src="${r.imageUrl}" class="w-24 h-24 rounded-lg object-cover bg-[#f4f1ea] border border-[#dcd7cd]">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="bg-green-100 text-green-700 border border-green-200 text-[9px] font-bold px-2 py-1 rounded-full uppercase"><i class="fas fa-retweet"></i> Reposted</span>
+                                <span class="text-[10px] font-bold text-[#a8a4a0]">${r.dateDisplay}</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-[#2d2a26]">${r.title}</h3>
+                            <p class="text-xs text-[#5c5855] mt-1 line-clamp-2">${r.description}</p>
+                            <div class="flex items-center gap-2 mt-3">
+                                <img src="https://ui-avatars.com/api/?name=${r.studentName}&background=a8a4a0&color=2d2a26" class="w-5 h-5 rounded-full">
+                                <span class="text-[10px] font-bold text-[#a8a4a0]">Original by ${r.studentName}</span>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        window.handleVote = async function(docId, type) { const ref = doc(db, "issues", docId); const d = (await getDoc(ref)).data(); const u = currentUser.uid; let up = {}; if(type==='up') up = d.upvotedBy?.includes(u)?{upvotedBy:arrayRemove(u)}:{upvotedBy:arrayUnion(u),downvotedBy:arrayRemove(u)}; else up = d.downvotedBy?.includes(u)?{downvotedBy:arrayRemove(u)}:{downvotedBy:arrayUnion(u),upvotedBy:arrayRemove(u)}; await updateDoc(ref, up); renderFeed(); }
+        window.toggleComments = (id) => { const el=document.getElementById(`comments-${id}`); if(el.classList.contains('open'))el.classList.remove('open'); else { el.classList.add('open'); loadComments(id); } };
+        async function loadComments(id) { const d = document.getElementById(`list-${id}`); d.innerHTML='Loading...'; const q = query(collection(db, "issues", id, "comments"), orderBy("timestamp", "asc")); const s = await getDocs(q); d.innerHTML=""; if(s.empty){d.innerHTML='No comments.';return;} 
+            s.forEach(c => { 
+                const dt=c.data(); 
+                const isOfficial = dt.isAdmin;
+                const bubbleClass = isOfficial ? "bg-[#2d2a26] text-[#e6e2dd] border-[#4a6fa5] border-l-4" : "bg-white text-[#2d2a26] border-[#dcd7cd]";
+                const nameClass = isOfficial ? "text-[#4a6fa5]" : "text-[#2d2a26]";
+                const badge = isOfficial ? `<span class="bg-[#4a6fa5] text-[9px] text-white px-1.5 rounded ml-2">OFFICIAL</span>` : "";
+
+                let commPic = dt.authorPic; let commBadge = dt.authorBadge;
+                if(dt.authorId === currentUser.uid && !isOfficial) { commPic = userProfile.profilePic; commBadge = getBadgeIcon(userProfile.points || 0); }
+                if(isOfficial) commPic = "https://ui-avatars.com/api/?name=CW&background=1e293b&color=fff&bold=true"; 
+
+                const finalCommPic = commPic || `https://ui-avatars.com/api/?name=${dt.authorName}&background=a8a4a0&color=fff&size=32&bold=true`;
+                
+                d.innerHTML += `
+                <div class="flex gap-3">
+                    <div class="avatar-container"><img src="${finalCommPic}" class="w-8 h-8 rounded-full object-cover border border-[#dcd7cd]"><div class="avatar-badge-mini">${commBadge||(isOfficial?'👮':'🐣')}</div></div>
+                    <div class="flex-1">
+                        <div class="${bubbleClass} p-3 rounded-xl shadow-sm inline-block w-full border">
+                            <div class="flex items-center mb-1"><span class="text-xs font-bold ${nameClass}">${dt.authorName}</span>${badge}</div>
+                            <p class="text-sm font-medium">${dt.text}</p>
+                        </div>
+                    </div>
+                </div>`; 
+            }); 
+        }
+        
+        window.postComment = async(id) => { 
+            const i=document.getElementById(`input-${id}`); if(!i.value.trim())return; 
+            const latestUser = (await getDoc(doc(db, "users", currentUser.uid))).data();
+            await addDoc(collection(db,"issues",id,"comments"),{text:i.value.trim(),authorId:currentUser.uid,authorName:latestUser?.fullName||"Student", authorPic: latestUser.profilePic || null, authorBadge: getBadgeIcon(latestUser.points||0), timestamp:serverTimestamp(),upvotedBy:[],downvotedBy:[]}); i.value=""; loadComments(id); 
+        };
+        window.voteComment = async(iId, cId, type) => { const ref=doc(db,"issues",iId,"comments",cId); const d=(await getDoc(ref)).data(); const u=currentUser.uid; let up={}; if(type==='up') up=d.upvotedBy?.includes(u)?{upvotedBy:arrayRemove(u)}:{upvotedBy:arrayUnion(u),downvotedBy:arrayRemove(u)}; else up=d.downvotedBy?.includes(u)?{downvotedBy:arrayRemove(u)}:{downvotedBy:arrayUnion(u),upvotedBy:arrayRemove(u)}; await updateDoc(ref,up); loadComments(iId); };
+
+        async function loadMyHistory() { 
+            const d = document.getElementById('history-container'); d.innerHTML='Loading...';
+            const q=query(collection(db,"issues"),where("studentId","==",currentUser.uid)); const s=await getDocs(q); d.innerHTML=""; if(s.empty) {d.innerHTML='No reports.';return;}
+            s.forEach(doc=>{
+                const r=doc.data(); 
+                let privateBadge = r.isPrivate ? `<span class="bg-[#e8e4da] text-[#5c5855] text-[10px] px-2 py-1 rounded border border-[#dcd7cd]"><i class="fas fa-lock"></i> Private</span>` : '';
+                
+                let ratingHTML = "";
+                if(r.status === "Resolved") {
+                   if(r.userRating) {
+                      let stars = "";
+                      for(let i=1; i<=5; i++) stars += i <= r.userRating ? '<i class="fas fa-star text-[#d4a373]"></i>' : '<i class="far fa-star text-[#dcd7cd]"></i>';
+                      ratingHTML = `<div class="mt-2"><div class="flex gap-1 text-xs">${stars}</div><p class="text-[9px] text-[#a8a4a0] font-bold mt-1">You Rated</p></div>`;
+                   } else {
+                      let stars = "";
+                      for(let i=1; i<=5; i++) stars += `<button onclick="submitRating('${doc.id}', ${i})" class="text-[#dcd7cd] hover:text-[#d4a373] transition"><i class="fas fa-star"></i></button>`;
+                      ratingHTML = `<div class="mt-2"><div class="flex gap-1 text-xs star-rating">${stars}</div><p class="text-[9px] text-[#4a6fa5] font-bold mt-1 cursor-pointer">Rate Fix</p></div>`;
+                   }
+                }
+
+                d.innerHTML+=`
+                <div class="vintage-card p-6 rounded-2xl flex gap-6 items-center">
+                    <img src="${r.imageUrl}" class="w-20 h-20 rounded-lg object-cover bg-[#f4f1ea] border border-[#dcd7cd]">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <h3 class="text-lg font-bold text-[#2d2a26]">${r.title}</h3>
+                            ${privateBadge}
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${r.status==='Resolved'?'text-green-700 bg-green-100 border border-green-200':'text-yellow-700 bg-yellow-100 border border-yellow-200'}">${r.status}</span>
+                        ${ratingHTML}
+                    </div>
+                </div>`;
+            }); 
+        }
+
+        window.submitRating = async(docId, rating) => {
+             if(confirm(`Rate this resolution ${rating} stars?`)) {
+                 await updateDoc(doc(db, "issues", docId), { userRating: rating });
+                 loadMyHistory(); 
+             }
+        }
+        
+        async function fetchChartData() { try { const q=query(collection(db,"issues")); const s=await getDocs(q); let h=0,a=0,i=0,c=0; s.forEach(d=>{const v=d.data().category; if(v=='Hostel')h++;if(v=='Academic')a++;if(v=='Infrastructure')i++;if(v=='Cleanliness')c++;}); renderChart([h,a,i,c]); } catch(e){console.error(e);} }
+        function renderChart(d){if(issuesChart)issuesChart.destroy(); const ctx=document.getElementById('resolvedIssuesChart').getContext('2d'); issuesChart=new Chart(ctx,{type:'bar',data:{labels:['Hostel','Academic','Infra','Cleanliness'],datasets:[{label:'Reports',data:d||[0,0,0,0],backgroundColor:['#4a6fa5','#c0583d','#d4a373','#8fa87a'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'#dcd7cd', borderDash:[5,5]}},x:{grid:{display:false}}}}});}
+        
+        window.showPage = function(pageId) {
+            document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active')); document.getElementById(pageId + '-page').classList.add('active'); 
+            document.querySelectorAll('.nav-link').forEach(btn => { btn.classList.remove('active'); btn.classList.add('text-[#a8a4a0]'); }); const activeBtn = document.getElementById('nav-' + pageId); if(activeBtn) { activeBtn.classList.add('active'); activeBtn.classList.remove('text-[#a8a4a0]'); } document.getElementById('header-title').innerText = pageId.charAt(0).toUpperCase() + pageId.slice(1); if(pageId === 'feed') renderFeed(); if(pageId === 'history') loadMyHistory(); if(pageId === 'reposts') loadMyReposts();
+            if(pageId==='dashboard' && map) setTimeout(()=>{ google.maps.event.trigger(map, 'resize'); map.setCenter({ lat: 25.4913, lng: 81.8667 }); }, 500); 
+        }
+
+        window.onclick = function(e) {
+            const notifMenu = document.getElementById('notif-menu'), notifBtn = document.getElementById('notif-btn');
+            const profileMenu = document.getElementById('profile-menu'), profileBtn = document.getElementById('profile-btn');
+            const settingsModal = document.getElementById('settings-modal');
+
+            if (notifMenu && !notifMenu.contains(e.target) && !notifBtn.contains(e.target)) notifMenu.classList.add('hidden');
+            if (profileMenu && !profileMenu.contains(e.target) && !profileBtn.contains(e.target)) profileMenu.classList.add('hidden');
+            if (settingsModal && !settingsModal.classList.contains('hidden') && e.target === settingsModal) settingsModal.classList.add('hidden');
+        };
+
+        window.toggleProfileMenu = () => document.getElementById('profile-menu').classList.toggle('hidden'); window.toggleSettingsModal = () => document.getElementById('settings-modal').classList.toggle('hidden'); window.handleLogout = async () => { await signOut(auth); localStorage.removeItem('mnnit_current_user'); window.location.href = 'login.html'; }; 
+        window.handleVote = handleVote; window.toggleComments = toggleComments; window.postComment = postComment; window.voteComment = voteComment; window.handleRepost = handleRepost; window.submitRating = submitRating;
+    </script>
+</body>
+</html>
